@@ -68,7 +68,8 @@ const auth = useAuthStore()
 
 <style scoped>
 .app-wrapper {
-  min-height: 100vh;
+min-height:100vh;
+display:flex;
 }
 
 .sidebar {
@@ -89,7 +90,8 @@ const auth = useAuthStore()
   background-color: rgba(255,255,255,0.2);
 }
 
-.main-content {
-  background-color: #f5f7fa;
+.main-content{
+flex:1;
+background:#f5f7fa;
 }
 </style>

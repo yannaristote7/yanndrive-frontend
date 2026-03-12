@@ -41,32 +41,42 @@ const fetchDocuments = async () => {
 Upload document
 ========================================
 */
+const handleFileChange = (event) => {
+  file.value = event.target.files[0]
+}
 
 const uploadDocument = async () => {
 
-    if (!file.value) return
+  if (!file.value) {
+    alert("Choisir un fichier")
+    return
+  }
 
-    const formData = new FormData()
+  const formData = new FormData()
+  formData.append("file", file.value)
 
-    formData.append("file", file.value)
+  try {
 
-    try {
+    await axios.post(
+      "http://localhost:8000/api/documents",
+      formData,
+      {
+        headers:{
+          "Content-Type":"multipart/form-data"
+        }
+      }
+    )
 
-        await axios.post("/documents", formData, {
-            headers: {
-                "Content-Type": "multipart/form-data"
-            }
-        })
+    file.value = null
+    fetchDocuments()
 
-        file.value = null
+    alert("Upload réussi")
 
-        fetchDocuments()
+  } catch (error) {
 
-    } catch (error) {
+    console.error("Erreur upload", error)
 
-        console.error("Erreur upload", error)
-
-    }
+  }
 }
 
 /*
@@ -210,7 +220,7 @@ onMounted(() => {
 
     <div class="upload-box">
 
-        <input type="file" @change="e => file = e.target.files[0]" />
+        <input type="file" @change="handleFileChange" />
 
         <button @click="uploadDocument">
             Upload
