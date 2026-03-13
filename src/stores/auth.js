@@ -3,52 +3,111 @@ import api from "@/api/axios";
 import router from "@/router";
 
 export const useAuthStore = defineStore("auth", {
+
     state: () => ({
         user: null,
-        token: localStorage.getItem("token") || null,
+        loading: false
     }),
 
     getters: {
-        isAuthenticated: (state) => !!state.token,
-        isAdmin: (state) => state.user?.role?.name === "admin",
+
+        isAuthenticated: (state) => !!state.user,
+
+        isAdmin: (state) => state.user?.role?.name === "admin"
+
     },
 
     actions: {
+
         async login(credentials) {
-            const response = await api.post("/login", credentials);
 
-            this.token = response.data.token;
-            this.user = response.data.user;
+            this.loading = true
 
-            localStorage.setItem("token", this.token);
+            try {
 
-            router.push("/dashboard");
+                // 1️⃣ récupérer cookie CSRF pour Sanctum
+                await api.get("/sanctum/csrf-cookie")
+
+                // 2️⃣ envoyer login
+                await api.post("/api/login", credentials)
+
+                // 3️⃣ récupérer utilisateur
+                const response = await api.get("/api/user")
+
+                this.user = response.data
+
+                // 4️⃣ redirection dashboard
+                router.push("/dashboard")
+
+            } catch (error) {
+
+                console.error("Erreur login :", error.response?.data || error)
+
+                throw error
+
+            } finally {
+
+                this.loading = false
+
+            }
+
         },
 
         async register(data) {
-            await api.post("/register", data);
-            await this.login({
-                email: data.email,
-                password: data.password,
-            });
+
+            try {
+
+                await api.post("/api/register", data)
+
+                await this.login({
+                    email: data.email,
+                    password: data.password
+                })
+
+            } catch (error) {
+
+                console.error("Erreur register :", error.response?.data || error)
+
+                throw error
+
+            }
+
         },
 
-        logout() {
-            this.user = null;
-            this.token = null;
-            localStorage.removeItem("token");
-            router.push("/login");
+        async logout() {
+
+            try {
+
+                await api.post("/api/logout")
+
+            } catch (error) {
+
+                console.warn("Erreur logout :", error)
+
+            }
+
+            this.user = null
+
+            router.push("/login")
+
         },
 
         async fetchUser() {
-            if (!this.token) return;
 
             try {
-                const response = await api.get("/user");
-                this.user = response.data;
+
+                const response = await api.get("//api/user")
+
+                this.user = response.data
+
             } catch (error) {
-                this.logout();
+
+                this.user = null
+
             }
-        },
-    },
-});
+
+        }
+
+    }
+
+})

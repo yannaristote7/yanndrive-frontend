@@ -8,7 +8,7 @@ const fetchLogs = async () => {
 
     try {
 
-        const response = await axios.get("/activity-logs")
+        const response = await axios.get("http://localhost:8000/activity-logs")
 
         logs.value = response.data
 

@@ -2,6 +2,14 @@
 import { ref, onMounted } from "vue"
 import axios from "axios"
 
+// Permet à Axios d'envoyer le cookie de session avec chaque requête
+axios.defaults.withCredentials = true;
+
+// Fonction pour récupérer le cookie CSRF (Sanctum)
+const getCSRF = async () => {
+  await axios.get("http://localhost:8000/sanctum/csrf-cookie");
+};
+
 const documents = ref([])
 const file = ref(null)
 
@@ -57,26 +65,18 @@ const uploadDocument = async () => {
 
   try {
 
-    await axios.post(
-      "http://localhost:8000/api/documents",
-      formData,
-      {
-        headers:{
-          "Content-Type":"multipart/form-data"
-        }
-      }
-    )
+    await axios.post("/api/documents", formData)
 
-    file.value = null
     fetchDocuments()
 
     alert("Upload réussi")
 
   } catch (error) {
 
-    console.error("Erreur upload", error)
+    console.error(error)
 
   }
+
 }
 
 /*
