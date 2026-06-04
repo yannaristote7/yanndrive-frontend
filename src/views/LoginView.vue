@@ -13,17 +13,24 @@ const login = async () => {
     error.value = ''
     loading.value = true
     try {
+        // 1. Login → récupère le token
         const res = await api.post('/api/login', {
             email: email.value,
             password: password.value
         })
         localStorage.setItem('token', res.data.token)
 
-        // Récupérer user avec role
+        // 2. Récupère le user avec son rôle
         const userRes = await api.get('/api/user')
-        localStorage.setItem('user', JSON.stringify(userRes.data))
+        const userData = userRes.data
+        localStorage.setItem('user', JSON.stringify(userData))
 
-        router.push('/dashboard')
+        // 3. Redirige selon le rôle
+        if (userData.role?.name === 'admin') {
+            router.push('/admin')
+        } else {
+            router.push('/dashboard')
+        }
     } catch (e) {
         error.value = e.response?.data?.message || 'Erreur de connexion'
     } finally {

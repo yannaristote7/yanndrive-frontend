@@ -16,8 +16,8 @@ const uploading = ref(false)
 // Partage
 const shareModal = ref(false)
 const selectedDoc = ref(null)
-const shareUserId = ref('')
-const shareTab = ref('user') // 'user' | 'link'
+const shareEmail = ref('')        // ← email au lieu de ID
+const shareTab = ref('user')
 const publicLinkResult = ref(null)
 const linkForm = ref({
     permission: 'read',
@@ -36,11 +36,12 @@ const fetchDocuments = async () => {
     try {
         const res = await api.get('/api/documents')
         if (res.data.type === 'admin') {
-            router.push('/admin')
-            return
+            documents.value = res.data.documents || []
+            sharedDocuments.value = []
+        } else {
+            documents.value = res.data.owned_documents || []
+            sharedDocuments.value = res.data.shared_documents || []
         }
-        documents.value = res.data.owned_documents || []
-        sharedDocuments.value = res.data.shared_documents || []
     } catch (e) {
         console.error(e.response?.data)
     } finally {
@@ -69,7 +70,6 @@ const uploadDocument = async () => {
         await fetchDocuments()
     } catch (e) {
         alert(e.response?.data?.message || 'Erreur upload')
-        console.error(e.response?.data)
     } finally {
         uploading.value = false
     }
@@ -118,7 +118,7 @@ PARTAGE MODAL
 */
 const openShare = (doc) => {
     selectedDoc.value = doc
-    shareUserId.value = ''
+    shareEmail.value = ''
     publicLinkResult.value = null
     shareTab.value = 'user'
     shareModal.value = true
@@ -130,14 +130,16 @@ const closeShare = () => {
 }
 
 const shareWithUser = async () => {
-    if (!shareUserId.value) return
+    if (!shareEmail.value) return
     try {
         await api.post(`/api/documents/${selectedDoc.value.id}/share`, {
-            user_id: shareUserId.value
+            email: shareEmail.value    // ← envoie email
         })
-        alert('Document partagé avec succès')
-        shareUserId.value = ''
+        alert('Document partagé avec succès !')
+        shareEmail.value = ''
         await fetchDocuments()
+        // Rafraîchit le doc sélectionné pour voir la liste màj
+        selectedDoc.value = documents.value.find(d => d.id === selectedDoc.value.id)
     } catch (e) {
         alert(e.response?.data?.message || 'Erreur partage')
     }
@@ -146,13 +148,22 @@ const shareWithUser = async () => {
 const generateLink = async () => {
     try {
         const res = await api.post(`/api/documents/${selectedDoc.value.id}/public-link`, {
-            permission: linkForm.value.permission,
-            allow_download: linkForm.value.allow_download,
+            permission:      linkForm.value.permission,
+            allow_download:  linkForm.value.allow_download,
             expires_in_days: linkForm.value.expires_in_days,
-            password: linkForm.value.password || null,
-            email: linkForm.value.email || null
+            password:        linkForm.value.password || null,
+            email:           linkForm.value.email || null
         })
-        publicLinkResult.value = res.data.public_url
+
+        // Extrait le token et les params de l'URL signée
+        const url = new URL(res.data.public_url)
+        const token = url.pathname.split('/').pop()
+        const expires = url.searchParams.get('expires')
+        const signature = url.searchParams.get('signature')
+
+        // Génère l'URL frontend
+        publicLinkResult.value = `http://localhost:5173/share/${token}?expires=${expires}&signature=${signature}`
+
     } catch (e) {
         alert(e.response?.data?.message || 'Erreur génération lien')
     }
@@ -181,6 +192,7 @@ UTILS
 ========================================
 */
 const formatSize = (bytes) => {
+    if (!bytes) return '—'
     if (bytes < 1024) return bytes + ' B'
     if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB'
     return (bytes / 1048576).toFixed(1) + ' MB'
@@ -209,7 +221,7 @@ onMounted(fetchDocuments)
     <!-- SIDEBAR -->
     <aside class="sidebar">
         <div class="sidebar-logo">
-            <span class="logo-y">Y</span>AMS
+            <span class="logo-y">Y</span>ANN
             <span class="logo-sub">Drive</span>
         </div>
 
@@ -254,11 +266,7 @@ onMounted(fetchDocuments)
                 <label for="fileInput" class="btn-choose">
                     {{ file ? file.name : '+ Choisir un fichier' }}
                 </label>
-                <button
-                    class="btn-upload"
-                    @click="uploadDocument"
-                    :disabled="!file || uploading"
-                >
+                <button class="btn-upload" @click="uploadDocument" :disabled="!file || uploading">
                     <span v-if="uploading" class="spinner"></span>
                     <span v-else>Uploader</span>
                 </button>
@@ -333,8 +341,13 @@ onMounted(fetchDocuments)
             <!-- TAB : PARTAGE UTILISATEUR -->
             <div v-if="shareTab === 'user'" class="modal-body">
                 <div class="field">
-                    <label>ID de l'utilisateur</label>
-                    <input v-model="shareUserId" type="number" placeholder="Ex: 2" />
+                    <label>Email de l'utilisateur</label>
+                    <input
+                        v-model="shareEmail"
+                        type="email"
+                        placeholder="alice@yamslogistics.com"
+                        @keyup.enter="shareWithUser"
+                    />
                 </div>
                 <button class="btn-primary" @click="shareWithUser">Partager</button>
 
@@ -343,8 +356,10 @@ onMounted(fetchDocuments)
                     <p class="shared-list-title">Déjà partagé avec :</p>
                     <div class="shared-user" v-for="u in selectedDoc.shared_with" :key="u.id">
                         <span class="shared-avatar">{{ u.name?.charAt(0) }}</span>
-                        <span>{{ u.name }}</span>
-                        <small>{{ u.email }}</small>
+                        <div>
+                            <div>{{ u.name }}</div>
+                            <small>{{ u.email }}</small>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -366,7 +381,7 @@ onMounted(fetchDocuments)
                 </div>
 
                 <div class="field">
-                    <label>Email destinataire (optionnel)</label>
+                    <label>Envoyer par email (optionnel)</label>
                     <input v-model="linkForm.email" type="email" placeholder="contact@externe.com" />
                 </div>
 
@@ -411,7 +426,6 @@ onMounted(fetchDocuments)
     font-family: 'DM Sans', sans-serif;
 }
 
-/* SIDEBAR */
 .sidebar {
     width: 240px;
     background: #111118;
@@ -512,7 +526,6 @@ onMounted(fetchDocuments)
 }
 .btn-logout:hover { color: #ff6b6b; }
 
-/* MAIN */
 .main {
     margin-left: 240px;
     flex: 1;
@@ -539,11 +552,7 @@ h1 {
 
 .page-sub { font-size: 13px; color: #555; margin: 0; }
 
-.upload-zone {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
+.upload-zone { display: flex; align-items: center; gap: 10px; }
 
 .btn-choose {
     background: #1a1a28;
@@ -558,6 +567,7 @@ h1 {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    display: block;
 }
 .btn-choose:hover { border-color: #FFB400; color: #FFB400; }
 
@@ -580,7 +590,6 @@ h1 {
 .btn-upload:hover:not(:disabled) { background: #ffc933; }
 .btn-upload:disabled { opacity: 0.5; cursor: not-allowed; }
 
-/* SECTIONS */
 .section { margin-bottom: 40px; }
 
 .section-title {
@@ -593,18 +602,9 @@ h1 {
     margin: 0 0 16px;
 }
 
-.loading, .empty {
-    color: #444;
-    font-size: 14px;
-    padding: 24px 0;
-}
+.loading, .empty { color: #444; font-size: 14px; padding: 24px 0; }
 
-/* DOC GRID */
-.doc-grid {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
+.doc-grid { display: flex; flex-direction: column; gap: 8px; }
 
 .doc-card {
     display: flex;
@@ -621,7 +621,6 @@ h1 {
 .doc-card.shared { border-left: 2px solid #FFB400; }
 
 .doc-icon { font-size: 24px; flex-shrink: 0; }
-
 .doc-info { flex: 1; min-width: 0; }
 
 .doc-name {
@@ -636,11 +635,7 @@ h1 {
 .doc-meta { font-size: 12px; color: #555; margin-top: 2px; }
 .doc-shared { font-size: 11px; color: #FFB400; margin-top: 2px; }
 
-.doc-actions {
-    display: flex;
-    gap: 6px;
-    flex-shrink: 0;
-}
+.doc-actions { display: flex; gap: 6px; flex-shrink: 0; }
 
 .btn-icon {
     background: #1a1a28;
@@ -655,7 +650,6 @@ h1 {
 .btn-icon:hover { background: #222238; border-color: #444; }
 .btn-icon.danger:hover { background: rgba(255,60,60,0.1); border-color: rgba(255,60,60,0.3); }
 
-/* MODAL */
 .modal-overlay {
     position: fixed;
     inset: 0;
@@ -763,11 +757,7 @@ input:focus, select:focus { outline: none; border-color: #FFB400; }
 input::placeholder { color: #333; }
 select option { background: #111118; }
 
-.field-check {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
+.field-check { display: flex; align-items: center; gap: 10px; }
 
 .btn-primary {
     background: #FFB400;
@@ -793,11 +783,7 @@ select option { background: #111118; }
 
 .link-label { font-size: 11px; color: #555; text-transform: uppercase; letter-spacing: 0.8px; margin: 0 0 8px; }
 
-.link-box {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
+.link-box { display: flex; align-items: center; gap: 10px; }
 
 .link-text {
     font-size: 11px;
@@ -819,7 +805,6 @@ select option { background: #111118; }
 }
 .btn-copy:hover { border-color: #FFB400; color: #FFB400; }
 
-/* Shared users list */
 .shared-list { margin-top: 4px; }
 .shared-list-title { font-size: 12px; color: #555; margin: 0 0 10px; }
 
@@ -849,7 +834,6 @@ select option { background: #111118; }
 
 .shared-user small { color: #444; font-size: 11px; }
 
-/* Spinner */
 .spinner {
     width: 14px;
     height: 14px;
