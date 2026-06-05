@@ -4,360 +4,114 @@ const router = useRouter()
 </script>
 
 <template>
-<div class="landing">
+<div class="min-h-screen bg-[#09090f] text-[#e0e0e0] flex flex-col"
+     style="font-family:'DM Sans',sans-serif; background-image: radial-gradient(ellipse at 10% 30%, rgba(255,180,0,0.06) 0%, transparent 55%), radial-gradient(ellipse at 90% 70%, rgba(255,100,0,0.04) 0%, transparent 50%)">
 
     <!-- NAVBAR -->
-    <nav class="navbar">
-        <div class="logo">
-            <span class="logo-y">Y</span>ANN
-            <span class="logo-sub">Drive</span>
+    <nav class="sticky top-0 z-50 flex justify-between items-center px-16 py-5 border-b border-[#1a1a28] bg-[rgba(9,9,15,0.9)] backdrop-blur-xl">
+        <div class="flex items-baseline gap-1" style="font-family:'Syne',sans-serif">
+            <span class="font-black text-2xl tracking-tight text-white"><span class="text-[#FFB400]">Y</span>AMS</span>
+            <span class="text-[10px] text-[#555] ml-1 tracking-[3px] uppercase">Drive</span>
         </div>
-        <div class="nav-buttons">
-            <router-link to="/login" class="btn-outline">Connexion</router-link>
-            <router-link to="/register" class="btn-primary">Créer un compte</router-link>
+        <div class="flex gap-3 items-center">
+            <router-link to="/login"
+                class="border border-[#2a2a3a] text-[#aaa] hover:border-[#FFB400] hover:text-[#FFB400] px-5 py-2.5 rounded-lg text-sm font-medium transition-all">
+                Connexion
+            </router-link>
+            <router-link to="/register"
+                class="bg-[#FFB400] hover:bg-[#ffc933] text-black px-5 py-2.5 rounded-lg text-sm font-bold transition-colors"
+                style="font-family:'Syne',sans-serif">
+                Créer un compte
+            </router-link>
         </div>
     </nav>
 
     <!-- HERO -->
-    <section class="hero">
-        <div class="hero-content">
-            <div class="badge">Plateforme documentaire sécurisée</div>
-            <h1>Stockez, partagez<br><span class="accent">et contrôlez</span><br>vos documents</h1>
-            <p>YamsDrive centralise tous vos fichiers d'entreprise avec des permissions granulaires, des liens sécurisés et un suivi complet des accès.</p>
-            <div class="hero-buttons">
-                <router-link to="/register" class="btn-primary big">Créer un compte</router-link>
-                <router-link to="/login" class="btn-outline big">Se connecter</router-link>
+    <section class="flex-1 flex items-center justify-center gap-20 px-16 py-20 max-w-[1200px] mx-auto w-full">
+        <div class="max-w-lg">
+            <div class="inline-flex items-center gap-2 bg-[rgba(255,180,0,0.1)] border border-[rgba(255,180,0,0.25)] text-[#FFB400] text-xs font-medium px-4 py-2 rounded-full mb-7 tracking-wide">
+                Plateforme documentaire sécurisée
+            </div>
+            <h1 class="text-[52px] font-black leading-[1.08] tracking-[-2px] text-white mb-6" style="font-family:'Syne',sans-serif">
+                Stockez, partagez<br>
+                <span class="text-[#FFB400]">et contrôlez</span><br>
+                vos documents
+            </h1>
+            <p class="text-[#666] text-base leading-relaxed mb-10">
+                YamsDrive centralise tous vos fichiers d'entreprise avec des permissions granulaires, des liens sécurisés et un suivi complet des accès.
+            </p>
+            <div class="flex gap-4 flex-wrap">
+                <router-link to="/register"
+                    class="bg-[#FFB400] hover:bg-[#ffc933] text-black font-bold px-7 py-3.5 rounded-lg text-base transition-colors"
+                    style="font-family:'Syne',sans-serif">
+                    Créer un compte
+                </router-link>
+                <router-link to="/login"
+                    class="border border-[#2a2a3a] text-[#aaa] hover:border-[#FFB400] hover:text-[#FFB400] px-7 py-3.5 rounded-lg text-base font-medium transition-all">
+                    Se connecter
+                </router-link>
             </div>
         </div>
-        <div class="hero-visual">
-            <div class="visual-card">
-                <div class="visual-header">
-                    <span class="dot red"></span>
-                    <span class="dot yellow"></span>
-                    <span class="dot green"></span>
-                    <span class="visual-title">Mes documents</span>
+
+        <!-- VISUAL CARD -->
+        <div class="shrink-0 hidden lg:block">
+            <div class="bg-[#111118] border border-[#222230] rounded-2xl w-[340px] overflow-hidden shadow-[0_40px_80px_rgba(0,0,0,0.5)]">
+                <div class="flex items-center gap-1.5 px-4 py-3.5 border-b border-[#1e1e2e]">
+                    <span class="w-2.5 h-2.5 rounded-full bg-[#ff5f57]"></span>
+                    <span class="w-2.5 h-2.5 rounded-full bg-[#febc2e]"></span>
+                    <span class="w-2.5 h-2.5 rounded-full bg-[#28c840]"></span>
+                    <span class="ml-2 text-[11px] font-bold text-[#555] uppercase tracking-widest" style="font-family:'Syne',sans-serif">Mes documents</span>
                 </div>
-                <div class="visual-row">
-                    <span class="vico">📕</span>
-                    <div class="vinfo">
-                        <div class="vname">Rapport_Q1_2025.pdf</div>
-                        <div class="vmeta">2.4 MB • Partagé avec 3</div>
+                <div v-for="(doc, i) in previewDocs" :key="i"
+                    class="flex items-center gap-3 px-4 py-3.5 border-b border-[#141420] last:border-0 hover:bg-[#14141e] transition-colors">
+                    <span class="text-xl shrink-0">{{ doc.icon }}</span>
+                    <div class="flex-1 min-w-0">
+                        <div class="text-[13px] text-[#ccc] truncate">{{ doc.name }}</div>
+                        <div class="text-[11px] text-[#444] mt-0.5">{{ doc.meta }}</div>
                     </div>
-                    <span class="vstatus shared">partagé</span>
-                </div>
-                <div class="visual-row">
-                    <span class="vico">📊</span>
-                    <div class="vinfo">
-                        <div class="vname">Budget_2025.xlsx</div>
-                        <div class="vmeta">890 KB • Privé</div>
-                    </div>
-                    <span class="vstatus private">privé</span>
-                </div>
-                <div class="visual-row">
-                    <span class="vico">📝</span>
-                    <div class="vinfo">
-                        <div class="vname">Contrat_Fournisseur.docx</div>
-                        <div class="vmeta">1.1 MB • Lien public</div>
-                    </div>
-                    <span class="vstatus link">lien</span>
-                </div>
-                <div class="visual-row">
-                    <span class="vico">🖼️</span>
-                    <div class="vinfo">
-                        <div class="vname">Logo_YamsGroup.png</div>
-                        <div class="vmeta">340 KB • Privé</div>
-                    </div>
-                    <span class="vstatus private">privé</span>
+                    <span :class="['text-[10px] font-semibold px-2 py-0.5 rounded uppercase tracking-wide shrink-0', doc.statusClass]">
+                        {{ doc.status }}
+                    </span>
                 </div>
             </div>
         </div>
     </section>
 
     <!-- FEATURES -->
-    <section class="features">
-        <div class="feature-card">
-            <div class="feature-icon">🔒</div>
-            <h3>Accès sécurisé</h3>
-            <p>Domaines autorisés uniquement. Chaque fichier est protégé par authentification Sanctum.</p>
-        </div>
-        <div class="feature-card">
-            <div class="feature-icon">🔗</div>
-            <h3>Liens publics</h3>
-            <p>Générez des liens temporaires avec mot de passe, date d'expiration et contrôle de téléchargement.</p>
-        </div>
-        <div class="feature-card">
-            <div class="feature-icon">👥</div>
-            <h3>Partage interne</h3>
-            <p>Partagez vos documents avec vos collègues en quelques clics, avec suivi des accès.</p>
-        </div>
-        <div class="feature-card">
-            <div class="feature-icon">📋</div>
-            <h3>Logs d'activité</h3>
-            <p>L'administrateur visualise toutes les actions en temps réel : uploads, partages, téléchargements.</p>
+    <section class="grid grid-cols-4 gap-4 px-16 pb-16 max-w-[1200px] mx-auto w-full max-lg:grid-cols-2 max-sm:grid-cols-1">
+        <div v-for="f in features" :key="f.title"
+            class="bg-[#111118] border border-[#1e1e2e] hover:border-[rgba(255,180,0,0.2)] rounded-xl p-6 transition-colors">
+            <div class="text-3xl mb-4">{{ f.icon }}</div>
+            <h3 class="text-[15px] font-bold text-white mb-2" style="font-family:'Syne',sans-serif">{{ f.title }}</h3>
+            <p class="text-[13px] text-[#555] leading-relaxed">{{ f.desc }}</p>
         </div>
     </section>
 
     <!-- FOOTER -->
-    <footer class="footer">
-        <span>© 2025 YAMS Group — YamsDrive</span>
+    <footer class="text-center py-6 border-t border-[#1a1a28] text-[12px] text-[#333]">
+        © 2025 YAMS Group — YamsDrive
     </footer>
 
 </div>
 </template>
 
-<style scoped>
-@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap');
-
-* { box-sizing: border-box; margin: 0; padding: 0; }
-
-.landing {
-    min-height: 100vh;
-    background: #0a0a0f;
-    color: #e0e0e0;
-    font-family: 'DM Sans', sans-serif;
-    display: flex;
-    flex-direction: column;
-    background-image:
-        radial-gradient(ellipse at 10% 30%, rgba(255,180,0,0.06) 0%, transparent 55%),
-        radial-gradient(ellipse at 90% 70%, rgba(255,100,0,0.04) 0%, transparent 50%);
+<script>
+export default {
+    data() {
+        return {
+            previewDocs: [
+                { icon: '📕', name: 'Rapport_Q1_2025.pdf', meta: '2.4 MB • Partagé avec 3', status: 'partagé', statusClass: 'bg-[rgba(255,180,0,0.1)] text-[#FFB400] border border-[rgba(255,180,0,0.2)]' },
+                { icon: '📊', name: 'Budget_2025.xlsx', meta: '890 KB • Privé', status: 'privé', statusClass: 'bg-white/5 text-[#555] border border-[#222]' },
+                { icon: '📝', name: 'Contrat_Fournisseur.docx', meta: '1.1 MB • Lien public', status: 'lien', statusClass: 'bg-[rgba(80,160,255,0.1)] text-[#5fa8ff] border border-[rgba(80,160,255,0.2)]' },
+                { icon: '🖼️', name: 'Logo_YamsGroup.png', meta: '340 KB • Privé', status: 'privé', statusClass: 'bg-white/5 text-[#555] border border-[#222]' },
+            ],
+            features: [
+                { icon: '🔒', title: 'Accès sécurisé', desc: 'Domaines autorisés uniquement. Chaque fichier est protégé par authentification Sanctum.' },
+                { icon: '🔗', title: 'Liens publics', desc: 'Générez des liens temporaires avec mot de passe, date d\'expiration et contrôle de téléchargement.' },
+                { icon: '👥', title: 'Partage interne', desc: 'Partagez vos documents avec vos collègues en quelques clics, avec suivi des accès.' },
+                { icon: '📋', title: 'Logs d\'activité', desc: 'L\'administrateur visualise toutes les actions en temps réel : uploads, partages, téléchargements.' },
+            ]
+        }
+    }
 }
-
-/* NAVBAR */
-.navbar {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 20px 60px;
-    border-bottom: 1px solid #1a1a28;
-    position: sticky;
-    top: 0;
-    background: rgba(10,10,15,0.9);
-    backdrop-filter: blur(10px);
-    z-index: 100;
-}
-
-.logo {
-    font-family: 'Syne', sans-serif;
-    font-weight: 800;
-    font-size: 22px;
-    color: #fff;
-    display: flex;
-    align-items: baseline;
-    gap: 2px;
-}
-
-.logo-y { color: #FFB400; }
-.logo-sub {
-    font-size: 11px;
-    font-weight: 400;
-    color: #555;
-    margin-left: 4px;
-    letter-spacing: 2px;
-    text-transform: uppercase;
-}
-
-.nav-buttons { display: flex; gap: 12px; align-items: center; }
-
-/* HERO */
-.hero {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 80px;
-    padding: 80px 60px;
-    max-width: 1200px;
-    margin: 0 auto;
-    width: 100%;
-}
-
-.hero-content { max-width: 520px; }
-
-.badge {
-    display: inline-block;
-    background: rgba(255,180,0,0.1);
-    border: 1px solid rgba(255,180,0,0.25);
-    color: #FFB400;
-    font-size: 12px;
-    font-weight: 500;
-    padding: 6px 14px;
-    border-radius: 20px;
-    letter-spacing: 0.5px;
-    margin-bottom: 24px;
-}
-
-h1 {
-    font-family: 'Syne', sans-serif;
-    font-size: 52px;
-    font-weight: 800;
-    color: #fff;
-    line-height: 1.1;
-    margin-bottom: 20px;
-    letter-spacing: -1.5px;
-}
-
-.accent { color: #FFB400; }
-
-.hero p {
-    font-size: 16px;
-    color: #666;
-    line-height: 1.7;
-    margin-bottom: 36px;
-}
-
-.hero-buttons { display: flex; gap: 14px; flex-wrap: wrap; }
-
-/* VISUAL CARD */
-.hero-visual { flex-shrink: 0; }
-
-.visual-card {
-    background: #111118;
-    border: 1px solid #222230;
-    border-radius: 14px;
-    width: 340px;
-    overflow: hidden;
-    box-shadow: 0 40px 80px rgba(0,0,0,0.5);
-}
-
-.visual-header {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 14px 18px;
-    border-bottom: 1px solid #1e1e2e;
-}
-
-.dot {
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-}
-.dot.red { background: #ff5f57; }
-.dot.yellow { background: #febc2e; }
-.dot.green { background: #28c840; }
-
-.visual-title {
-    font-family: 'Syne', sans-serif;
-    font-size: 12px;
-    font-weight: 700;
-    color: #555;
-    margin-left: 6px;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-}
-
-.visual-row {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 14px 18px;
-    border-bottom: 1px solid #141420;
-    transition: background 0.15s;
-}
-.visual-row:last-child { border-bottom: none; }
-.visual-row:hover { background: #14141e; }
-
-.vico { font-size: 20px; flex-shrink: 0; }
-.vinfo { flex: 1; min-width: 0; }
-.vname { font-size: 13px; color: #ccc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.vmeta { font-size: 11px; color: #444; margin-top: 2px; }
-
-.vstatus {
-    font-size: 10px;
-    font-weight: 600;
-    padding: 3px 8px;
-    border-radius: 4px;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    flex-shrink: 0;
-}
-.vstatus.shared { background: rgba(255,180,0,0.1); color: #FFB400; border: 1px solid rgba(255,180,0,0.2); }
-.vstatus.private { background: rgba(255,255,255,0.05); color: #555; border: 1px solid #222; }
-.vstatus.link { background: rgba(80,160,255,0.1); color: #5fa8ff; border: 1px solid rgba(80,160,255,0.2); }
-
-/* FEATURES */
-.features {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 16px;
-    padding: 60px;
-    max-width: 1200px;
-    margin: 0 auto;
-    width: 100%;
-}
-
-.feature-card {
-    background: #111118;
-    border: 1px solid #1e1e2e;
-    border-radius: 12px;
-    padding: 24px;
-    transition: border-color 0.2s;
-}
-.feature-card:hover { border-color: rgba(255,180,0,0.2); }
-
-.feature-icon { font-size: 28px; margin-bottom: 14px; }
-
-.feature-card h3 {
-    font-family: 'Syne', sans-serif;
-    font-size: 15px;
-    font-weight: 700;
-    color: #fff;
-    margin-bottom: 8px;
-}
-
-.feature-card p { font-size: 13px; color: #555; line-height: 1.6; }
-
-/* BUTTONS */
-.btn-primary {
-    background: #FFB400;
-    color: #0a0a0f;
-    padding: 11px 22px;
-    border-radius: 8px;
-    text-decoration: none;
-    font-weight: 700;
-    font-family: 'Syne', sans-serif;
-    font-size: 14px;
-    transition: background 0.15s;
-    white-space: nowrap;
-}
-.btn-primary:hover { background: #ffc933; }
-.btn-primary.big { padding: 13px 28px; font-size: 15px; }
-
-.btn-outline {
-    border: 1px solid #2a2a3a;
-    color: #aaa;
-    padding: 11px 22px;
-    border-radius: 8px;
-    text-decoration: none;
-    font-weight: 500;
-    font-size: 14px;
-    transition: all 0.15s;
-    white-space: nowrap;
-}
-.btn-outline:hover { border-color: #FFB400; color: #FFB400; }
-.btn-outline.big { padding: 13px 28px; font-size: 15px; }
-
-/* FOOTER */
-.footer {
-    text-align: center;
-    padding: 24px;
-    border-top: 1px solid #1a1a28;
-    font-size: 12px;
-    color: #333;
-}
-
-/* RESPONSIVE */
-@media (max-width: 900px) {
-    .hero { flex-direction: column; padding: 40px 24px; gap: 40px; text-align: center; }
-    .hero-visual { display: none; }
-    h1 { font-size: 36px; }
-    .features { grid-template-columns: repeat(2, 1fr); padding: 40px 24px; }
-    .navbar { padding: 16px 24px; }
-    .hero-buttons { justify-content: center; }
-}
-
-@media (max-width: 500px) {
-    .features { grid-template-columns: 1fr; }
-    h1 { font-size: 30px; }
-}
-</style>
+</script>

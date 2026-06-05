@@ -3,6 +3,8 @@ import LoginView from '@/views/LoginView.vue'
 import RegisterView from '@/views/RegisterView.vue'
 import DashboardView from '@/views/DashboardView.vue'
 import AdminView from '@/views/AdminView.vue'
+import ActivityLogsView from '@/views/ActivityLogsView.vue'
+
 
 
 const routes = [
@@ -11,7 +13,8 @@ const routes = [
     { path: '/register', component: RegisterView, meta: { guest: true } },
     { path: '/dashboard', component: DashboardView, meta: { requiresAuth: true } },
     { path: '/admin', component: AdminView, meta: { requiresAuth: true, requiresAdmin: true } },
-    { path: '/share/:token', component: () => import('@/views/PublicShareView.vue') }
+    { path: '/share/:token', component: () => import('@/views/PublicShareView.vue') },
+    { path: '/admin/logs', component: ActivityLogsView, meta: { requiresAuth: true, requiresAdmin: true } }
 ]
 
 const router = createRouter({

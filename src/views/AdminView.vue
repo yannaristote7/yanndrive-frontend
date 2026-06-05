@@ -1,600 +1,318 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '@/api'
 
 const router = useRouter()
 const user = ref(JSON.parse(localStorage.getItem('user') || 'null'))
+const isAdmin = computed(() => user.value?.role?.name === 'admin')
 
 const documents = ref([])
-const logs = ref([])
-const stats = ref(null)
+const sharedDocuments = ref([])
+const file = ref(null)
 const loading = ref(true)
-const activeTab = ref('documents') // 'documents' | 'logs'
+const uploading = ref(false)
 
-/*
-========================================
-FETCH DOCUMENTS (ADMIN)
-========================================
-*/
+const shareModal = ref(false)
+const selectedDoc = ref(null)
+const shareEmail = ref('')
+const shareTab = ref('user')
+const publicLinkResult = ref(null)
+const linkForm = ref({ permission: 'read', allow_download: true, expires_in_days: 7, password: '', email: '' })
+
 const fetchDocuments = async () => {
     try {
         const res = await api.get('/api/documents')
-        documents.value = res.data.documents || []
-    } catch (e) {
-        console.error(e.response?.data)
-    }
+        if (res.data.type === 'admin') {
+            documents.value = res.data.documents || []
+            sharedDocuments.value = []
+        } else {
+            documents.value = res.data.owned_documents || []
+            sharedDocuments.value = res.data.shared_documents || []
+        }
+    } catch (e) { console.error(e.response?.data) }
+    finally { loading.value = false }
 }
 
-/*
-========================================
-FETCH LOGS
-========================================
-*/
-const fetchLogs = async () => {
-    try {
-        const [logsRes, statsRes] = await Promise.all([
-            api.get('/api/admin/logs'),
-            api.get('/api/admin/logs/stats')
-        ])
-        logs.value = logsRes.data.data || []
-        stats.value = statsRes.data
-    } catch (e) {
-        console.error(e.response?.data)
-    }
-}
+const handleFileChange = (e) => { file.value = e.target.files[0] }
 
-/*
-========================================
-DELETE DOCUMENT
-========================================
-*/
-const deleteDocument = async (id) => {
-    if (!confirm('Supprimer définitivement ce document ?')) return
+const uploadDocument = async () => {
+    if (!file.value) return
+    uploading.value = true
+    const formData = new FormData()
+    formData.append('file', file.value)
     try {
-        await api.delete(`/api/documents/${id}`)
+        await api.post('/api/documents', formData)
+        file.value = null
+        document.getElementById('fileInput').value = ''
         await fetchDocuments()
-    } catch (e) {
-        alert(e.response?.data?.message || 'Erreur suppression')
-    }
+    } catch (e) { alert(e.response?.data?.message || 'Erreur upload') }
+    finally { uploading.value = false }
 }
 
-/*
-========================================
-DOWNLOAD
-========================================
-*/
+const deleteDocument = async (id) => {
+    if (!confirm('Supprimer ce document ?')) return
+    try { await api.delete(`/api/documents/${id}`); await fetchDocuments() }
+    catch (e) { alert(e.response?.data?.message || 'Erreur suppression') }
+}
+
 const downloadDocument = async (id, name) => {
     try {
-        const res = await api.get(`/api/documents/${id}/download`, {
-            responseType: 'blob'
-        })
+        const res = await api.get(`/api/documents/${id}/download`, { responseType: 'blob' })
         const url = window.URL.createObjectURL(new Blob([res.data]))
-        const a = document.createElement('a')
-        a.href = url
-        a.download = name
-        a.click()
+        const a = document.createElement('a'); a.href = url; a.download = name; a.click()
         window.URL.revokeObjectURL(url)
-    } catch (e) {
-        alert('Erreur téléchargement')
-    }
+    } catch (e) { alert('Erreur téléchargement') }
 }
 
-/*
-========================================
-LOGOUT
-========================================
-*/
+const openShare = (doc) => { selectedDoc.value = doc; shareEmail.value = ''; publicLinkResult.value = null; shareTab.value = 'user'; shareModal.value = true }
+const closeShare = () => { shareModal.value = false; selectedDoc.value = null }
+
+const shareWithUser = async () => {
+    if (!shareEmail.value) return
+    try {
+        await api.post(`/api/documents/${selectedDoc.value.id}/share`, { email: shareEmail.value })
+        shareEmail.value = ''
+        await fetchDocuments()
+        selectedDoc.value = documents.value.find(d => d.id === selectedDoc.value.id)
+    } catch (e) { alert(e.response?.data?.message || 'Erreur partage') }
+}
+
+const generateLink = async () => {
+    try {
+        const res = await api.post(`/api/documents/${selectedDoc.value.id}/public-link`, {
+            permission: linkForm.value.permission,
+            allow_download: linkForm.value.allow_download,
+            expires_in_days: linkForm.value.expires_in_days,
+            password: linkForm.value.password || null,
+            email: linkForm.value.email || null
+        })
+        const url = new URL(res.data.public_url)
+        const token = url.pathname.split('/').pop()
+        const expires = url.searchParams.get('expires')
+        const signature = url.searchParams.get('signature')
+        publicLinkResult.value = `http://localhost:5173/share/${token}?expires=${expires}&signature=${signature}`
+    } catch (e) { alert(e.response?.data?.message || 'Erreur génération lien') }
+}
+
+const copyLink = () => { navigator.clipboard.writeText(publicLinkResult.value); alert('Lien copié !') }
+
 const logout = async () => {
     await api.post('/api/logout')
-    localStorage.removeItem('token')
-    localStorage.removeItem('user')
+    localStorage.removeItem('token'); localStorage.removeItem('user')
     router.push('/login')
 }
 
-/*
-========================================
-UTILS
-========================================
-*/
-const formatSize = (bytes) => {
-    if (!bytes) return '—'
-    if (bytes < 1024) return bytes + ' B'
-    if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB'
-    return (bytes / 1048576).toFixed(1) + ' MB'
-}
+const formatSize = (b) => { if (!b) return '—'; if (b < 1024) return b + ' B'; if (b < 1048576) return (b/1024).toFixed(1)+' KB'; return (b/1048576).toFixed(1)+' MB' }
+const formatDate = (d) => new Date(d).toLocaleDateString('fr-FR', { day:'2-digit', month:'short', year:'numeric' })
+const fileIcon = (m) => { if (!m) return '📄'; if (m.includes('pdf')) return '📕'; if (m.includes('image')) return '🖼️'; if (m.includes('word')||m.includes('document')) return '📝'; if (m.includes('sheet')||m.includes('excel')) return '📊'; if (m.includes('zip')) return '📦'; return '📄' }
 
-const formatDate = (d) => {
-    if (!d) return '—'
-    return new Date(d).toLocaleDateString('fr-FR', {
-        day: '2-digit', month: 'short', year: 'numeric',
-        hour: '2-digit', minute: '2-digit'
-    })
-}
+const inputClass = "w-full bg-[#0d0d14] border border-[#222230] rounded-lg px-3 py-2.5 text-white text-sm placeholder-[#333] focus:outline-none focus:border-[#FFB400] transition-colors"
 
-const fileIcon = (mime) => {
-    if (!mime) return '📄'
-    if (mime.includes('pdf')) return '📕'
-    if (mime.includes('image')) return '🖼️'
-    if (mime.includes('word') || mime.includes('document')) return '📝'
-    if (mime.includes('sheet') || mime.includes('excel')) return '📊'
-    if (mime.includes('zip')) return '📦'
-    return '📄'
-}
-
-onMounted(async () => {
-    await Promise.all([fetchDocuments(), fetchLogs()])
-    loading.value = false
-})
+onMounted(fetchDocuments)
 </script>
 
 <template>
-<div class="dashboard">
+<div class="min-h-screen bg-[#09090f] text-[#e0e0e0]" style="display:flex;">
 
     <!-- SIDEBAR -->
-    <aside class="sidebar">
-        <div class="sidebar-logo">
-            <span class="logo-y">Y</span>AMS
-            <span class="logo-sub">Drive</span>
+    <aside class="w-60 bg-[#111118] border-r border-[#1e1e2e] flex flex-col p-5 fixed h-screen">
+        <div class="flex items-baseline gap-1 mb-9">
+            <span class="font-black text-xl tracking-tight text-white" style="font-family:'Syne',sans-serif">
+                <span class="text-[#FFB400]">Y</span>AMS
+            </span>
+            <span class="text-[10px] text-[#555] ml-1 tracking-[3px] uppercase">Drive</span>
         </div>
 
-        <nav class="sidebar-nav">
-            <a class="nav-item" @click="router.push('/dashboard')">
-                <span class="nav-icon">📁</span> Mes fichiers
+        <nav class="flex-1 space-y-1">
+            <a class="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium cursor-pointer bg-[rgba(255,180,0,0.1)] text-[#FFB400]">
+                <span>📁</span> Mes fichiers
             </a>
-            <a class="nav-item active">
-                <span class="nav-icon">🛡️</span> Administration
+            <a v-if="isAdmin" @click="router.push('/admin')"
+                class="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium cursor-pointer text-[#666] hover:bg-[#1a1a28] hover:text-[#ccc] transition-all">
+                <span>🛡️</span> Administration
+            </a>
+            <a @click="router.push('/admin/logs')" class="flex items-center gap-2.5 px-3 py-2.5 ...">
+               <span>📋</span> Logs d'activité
             </a>
         </nav>
 
-        <div class="sidebar-user">
-            <div class="user-avatar">{{ user?.name?.charAt(0) }}</div>
-            <div class="user-info">
-                <div class="user-name">{{ user?.name }}</div>
-                <div class="user-role">Admin</div>
+        <div class="flex items-center gap-2.5 p-3 bg-[#0d0d14] rounded-xl border border-[#1e1e2e]">
+            <div class="w-8 h-8 bg-[#FFB400] text-black rounded-full flex items-center justify-center font-bold text-sm shrink-0">
+                {{ user?.name?.charAt(0) }}
             </div>
-            <button class="btn-logout" @click="logout" title="Déconnexion">↩</button>
+            <div class="flex-1 min-w-0">
+                <div class="text-xs font-semibold text-[#ddd] truncate">{{ user?.name }}</div>
+                <div class="text-[10px] text-[#555] uppercase tracking-wide">{{ user?.role?.name }}</div>
+            </div>
+            <button @click="logout" class="text-[#555] hover:text-red-400 transition-colors text-base ml-1">↩</button>
         </div>
     </aside>
 
     <!-- MAIN -->
-    <main class="main">
+    <main class="flex-1 p-10" style="margin-left: 240px;">
 
         <!-- HEADER -->
-        <div class="page-header">
+        <div class="flex items-start justify-between mb-10 gap-5 flex-wrap">
             <div>
-                <h1>Administration</h1>
-                <p class="page-sub">Vue globale de tous les documents et activités</p>
+                <h1 class="text-2xl font-black text-white mb-1" style="font-family:'Syne',sans-serif">Mes documents</h1>
+                <p class="text-xs text-[#555]">{{ documents.length }} fichier(s) • {{ sharedDocuments.length }} partagé(s) avec moi</p>
+            </div>
+
+            <!-- UPLOAD -->
+            <div class="flex items-center gap-2.5">
+                <input id="fileInput" type="file" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx,.txt,.zip" @change="handleFileChange" class="hidden" />
+                <label for="fileInput"
+                    class="bg-[#1a1a28] border border-dashed border-[#333] hover:border-[#FFB400] hover:text-[#FFB400] text-[#aaa] rounded-lg px-4 py-2.5 text-xs cursor-pointer transition-all truncate max-w-[180px]">
+                    {{ file ? file.name : '+ Choisir un fichier' }}
+                </label>
+                <button @click="uploadDocument" :disabled="!file || uploading"
+                    class="bg-[#FFB400] hover:bg-[#ffc933] disabled:opacity-50 disabled:cursor-not-allowed text-black font-bold rounded-lg px-5 py-2.5 text-xs flex items-center gap-2 transition-colors whitespace-nowrap"
+                    style="font-family:'Syne',sans-serif">
+                    <span v-if="uploading" class="w-3 h-3 border-2 border-black/30 border-t-black rounded-full animate-spin"></span>
+                    <span v-else>Uploader</span>
+                </button>
             </div>
         </div>
 
-        <!-- STATS -->
-        <div class="stats-row" v-if="stats">
-            <div class="stat-card">
-                <div class="stat-value">{{ documents.length }}</div>
-                <div class="stat-label">Documents totaux</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value">{{ stats.total_logs }}</div>
-                <div class="stat-label">Logs totaux</div>
-            </div>
-            <div class="stat-card success">
-                <div class="stat-value">{{ stats.success_logs }}</div>
-                <div class="stat-label">Actions réussies</div>
-            </div>
-            <div class="stat-card danger">
-                <div class="stat-value">{{ stats.failed_logs }}</div>
-                <div class="stat-label">Actions échouées</div>
-            </div>
-        </div>
+        <!-- MES FICHIERS -->
+        <section class="mb-10">
+            <h2 class="text-[11px] font-bold text-[#555] uppercase tracking-[2px] mb-4" style="font-family:'Syne',sans-serif">Mes fichiers</h2>
 
-        <!-- TABS -->
-        <div class="tabs">
-            <button :class="['tab', activeTab === 'documents' && 'active']" @click="activeTab = 'documents'">
-                📁 Documents ({{ documents.length }})
-            </button>
-            <button :class="['tab', activeTab === 'logs' && 'active']" @click="activeTab = 'logs'">
-                📋 Logs d'activité ({{ logs.length }})
-            </button>
-        </div>
+            <div v-if="loading" class="text-[#444] text-sm py-6">Chargement...</div>
+            <div v-else-if="documents.length === 0" class="text-[#444] text-sm py-6">Aucun document. Uploadez votre premier fichier !</div>
 
-        <!-- TAB : DOCUMENTS -->
-        <div v-if="activeTab === 'documents'">
-            <div v-if="loading" class="loading">Chargement...</div>
-            <div v-else-if="documents.length === 0" class="empty">Aucun document.</div>
-            <div v-else class="table-wrap">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Fichier</th>
-                            <th>Propriétaire</th>
-                            <th>Partagé avec</th>
-                            <th>Taille</th>
-                            <th>Date</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr v-for="doc in documents" :key="doc.id">
-                            <td>
-                                <div class="file-cell">
-                                    <span class="file-ico">{{ fileIcon(doc.mime_type) }}</span>
-                                    <span class="file-name">{{ doc.name }}</span>
-                                </div>
-                            </td>
-                            <td>
-                                <div class="user-cell">
-                                    <span class="mini-avatar">{{ doc.user?.name?.charAt(0) }}</span>
-                                    <div>
-                                        <div class="cell-name">{{ doc.user?.name }}</div>
-                                        <div class="cell-sub">{{ doc.user?.email }}</div>
-                                    </div>
-                                </div>
-                            </td>
-                            <td>
-                                <span v-if="!doc.shared_with?.length" class="cell-empty">—</span>
-                                <div v-else class="shared-badges">
-                                    <span class="badge" v-for="u in doc.shared_with" :key="u.id">
-                                        {{ u.name }}
-                                    </span>
-                                </div>
-                            </td>
-                            <td class="cell-mono">{{ formatSize(doc.size) }}</td>
-                            <td class="cell-date">{{ formatDate(doc.created_at) }}</td>
-                            <td>
-                                <div class="action-btns">
-                                    <button class="btn-icon" @click="downloadDocument(doc.id, doc.name)" title="Télécharger">⬇</button>
-                                    <button class="btn-icon danger" @click="deleteDocument(doc.id)" title="Supprimer">🗑</button>
-                                </div>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
+            <div v-else class="space-y-2">
+                <div v-for="doc in documents" :key="doc.id"
+                    class="flex items-center gap-4 bg-[#111118] border border-[#1e1e2e] hover:border-[#2e2e44] rounded-xl px-5 py-4 transition-colors">
+                    <span class="text-2xl shrink-0">{{ fileIcon(doc.mime_type) }}</span>
+                    <div class="flex-1 min-w-0">
+                        <div class="text-sm font-medium text-[#ddd] truncate">{{ doc.name }}</div>
+                        <div class="text-xs text-[#555] mt-0.5">{{ formatSize(doc.size) }} • {{ formatDate(doc.created_at) }}</div>
+                        <div v-if="doc.shared_with?.length" class="text-[11px] text-[#FFB400] mt-0.5">
+                            Partagé avec {{ doc.shared_with.length }} personne(s)
+                        </div>
+                    </div>
+                    <div class="flex gap-1.5 shrink-0">
+                        <button @click="downloadDocument(doc.id, doc.name)"
+                            class="bg-[#1a1a28] border border-[#2a2a3a] hover:bg-[#222238] hover:border-[#444] rounded-md px-2.5 py-1.5 text-sm transition-all">⬇</button>
+                        <button @click="openShare(doc)"
+                            class="bg-[#1a1a28] border border-[#2a2a3a] hover:bg-[#222238] hover:border-[#444] rounded-md px-2.5 py-1.5 text-sm transition-all">🔗</button>
+                        <button @click="deleteDocument(doc.id)"
+                            class="bg-[#1a1a28] border border-[#2a2a3a] hover:bg-red-500/10 hover:border-red-500/30 rounded-md px-2.5 py-1.5 text-sm transition-all">🗑</button>
+                    </div>
+                </div>
             </div>
-        </div>
+        </section>
 
-        <!-- TAB : LOGS -->
-        <div v-if="activeTab === 'logs'">
-            <div v-if="loading" class="loading">Chargement...</div>
-            <div v-else-if="logs.length === 0" class="empty">Aucun log.</div>
-            <div v-else class="table-wrap">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Statut</th>
-                            <th>Action</th>
-                            <th>Utilisateur</th>
-                            <th>Description</th>
-                            <th>IP</th>
-                            <th>Date</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr v-for="log in logs" :key="log.id">
-                            <td>
-                                <span :class="['status-dot', log.success ? 'ok' : 'fail']">
-                                    {{ log.success ? '✓' : '✗' }}
-                                </span>
-                            </td>
-                            <td><span class="action-tag">{{ log.action }}</span></td>
-                            <td>
-                                <div v-if="log.user" class="user-cell">
-                                    <span class="mini-avatar">{{ log.user?.name?.charAt(0) }}</span>
-                                    <div class="cell-name">{{ log.user?.name }}</div>
-                                </div>
-                                <span v-else class="cell-empty">Système</span>
-                            </td>
-                            <td class="cell-desc">{{ log.description || '—' }}</td>
-                            <td class="cell-mono">{{ log.ip_address || '—' }}</td>
-                            <td class="cell-date">{{ formatDate(log.created_at) }}</td>
-                        </tr>
-                    </tbody>
-                </table>
+        <!-- PARTAGÉS AVEC MOI -->
+        <section v-if="sharedDocuments.length > 0">
+            <h2 class="text-[11px] font-bold text-[#555] uppercase tracking-[2px] mb-4" style="font-family:'Syne',sans-serif">Partagés avec moi</h2>
+            <div class="space-y-2">
+                <div v-for="doc in sharedDocuments" :key="doc.id"
+                    class="flex items-center gap-4 bg-[#111118] border-l-2 border-l-[#FFB400] border border-[#1e1e2e] rounded-xl px-5 py-4">
+                    <span class="text-2xl shrink-0">{{ fileIcon(doc.mime_type) }}</span>
+                    <div class="flex-1 min-w-0">
+                        <div class="text-sm font-medium text-[#ddd] truncate">{{ doc.name }}</div>
+                        <div class="text-xs text-[#555] mt-0.5">Par {{ doc.user?.name }} • {{ formatDate(doc.created_at) }}</div>
+                    </div>
+                    <button @click="downloadDocument(doc.id, doc.name)"
+                        class="bg-[#1a1a28] border border-[#2a2a3a] hover:bg-[#222238] rounded-md px-2.5 py-1.5 text-sm transition-all shrink-0">⬇</button>
+                </div>
             </div>
-        </div>
-
+        </section>
     </main>
+
+    <!-- MODAL PARTAGE -->
+    <div v-if="shareModal" @click.self="closeShare"
+        class="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 px-4">
+        <div class="bg-[#111118] border border-[#222230] rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+
+            <div class="flex items-center justify-between px-6 py-5 border-b border-[#1e1e2e]">
+                <h3 class="text-base font-bold text-white truncate max-w-[340px]" style="font-family:'Syne',sans-serif">
+                    Partager « {{ selectedDoc?.name }} »
+                </h3>
+                <button @click="closeShare" class="text-[#555] hover:text-white text-lg transition-colors ml-3">✕</button>
+            </div>
+
+            <!-- TABS -->
+            <div class="flex px-6 pt-4 gap-2 border-b border-[#1e1e2e]">
+                <button v-for="tab in [{id:'user',label:'Utilisateur interne'},{id:'link',label:'Lien public'}]" :key="tab.id"
+                    @click="shareTab = tab.id"
+                    :class="['pb-3 text-sm font-medium border-b-2 transition-all', shareTab === tab.id ? 'text-[#FFB400] border-[#FFB400]' : 'text-[#555] border-transparent hover:text-[#aaa]']">
+                    {{ tab.label }}
+                </button>
+            </div>
+
+            <!-- TAB USER -->
+            <div v-if="shareTab === 'user'" class="px-6 py-5 space-y-4">
+                <div>
+                    <label class="block text-[11px] font-medium text-[#666] uppercase tracking-[1px] mb-2">Email de l'utilisateur</label>
+                    <input v-model="shareEmail" type="email" placeholder="alice@yamslogistics.com" @keyup.enter="shareWithUser" :class="inputClass" />
+                </div>
+                <button @click="shareWithUser"
+                    class="w-full bg-[#FFB400] hover:bg-[#ffc933] text-black font-bold rounded-lg py-3 text-sm transition-colors"
+                    style="font-family:'Syne',sans-serif">Partager</button>
+
+                <div v-if="selectedDoc?.shared_with?.length" class="pt-2">
+                    <p class="text-xs text-[#555] mb-3">Déjà partagé avec :</p>
+                    <div v-for="u in selectedDoc.shared_with" :key="u.id"
+                        class="flex items-center gap-2.5 py-2 border-b border-[#1a1a28]">
+                        <div class="w-7 h-7 bg-[#FFB400] text-black rounded-full flex items-center justify-center font-bold text-xs shrink-0">
+                            {{ u.name?.charAt(0) }}
+                        </div>
+                        <div>
+                            <div class="text-sm text-[#aaa]">{{ u.name }}</div>
+                            <div class="text-xs text-[#444]">{{ u.email }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB LINK -->
+            <div v-if="shareTab === 'link'" class="px-6 py-5 space-y-4">
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-[11px] font-medium text-[#666] uppercase tracking-[1px] mb-2">Permission</label>
+                        <select v-model="linkForm.permission" :class="inputClass">
+                            <option value="read">Lecture seule</option>
+                            <option value="edit">Édition</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-medium text-[#666] uppercase tracking-[1px] mb-2">Expire (jours)</label>
+                        <input v-model="linkForm.expires_in_days" type="number" min="1" max="30" :class="inputClass" />
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-[11px] font-medium text-[#666] uppercase tracking-[1px] mb-2">Email (optionnel)</label>
+                    <input v-model="linkForm.email" type="email" placeholder="contact@externe.com" :class="inputClass" />
+                </div>
+                <div>
+                    <label class="block text-[11px] font-medium text-[#666] uppercase tracking-[1px] mb-2">Mot de passe (optionnel)</label>
+                    <input v-model="linkForm.password" type="password" placeholder="Protéger le lien" :class="inputClass" />
+                </div>
+                <label class="flex items-center gap-2.5 cursor-pointer">
+                    <input type="checkbox" v-model="linkForm.allow_download" class="accent-[#FFB400]" />
+                    <span class="text-sm text-[#aaa]">Autoriser le téléchargement</span>
+                </label>
+
+                <button @click="generateLink"
+                    class="w-full bg-[#FFB400] hover:bg-[#ffc933] text-black font-bold rounded-lg py-3 text-sm transition-colors"
+                    style="font-family:'Syne',sans-serif">Générer le lien</button>
+
+                <div v-if="publicLinkResult" class="bg-[#0d0d14] border border-[#222230] rounded-lg p-4">
+                    <p class="text-[10px] text-[#555] uppercase tracking-[1px] mb-2">Lien généré</p>
+                    <div class="flex items-center gap-2">
+                        <span class="text-[11px] text-[#FFB400] break-all flex-1">{{ publicLinkResult }}</span>
+                        <button @click="copyLink"
+                            class="bg-[#1a1a28] border border-[#333] hover:border-[#FFB400] hover:text-[#FFB400] text-[#aaa] rounded-md px-3 py-1.5 text-xs transition-all shrink-0">
+                            Copier
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 </template>
-
-<style scoped>
-@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap');
-
-* { box-sizing: border-box; }
-
-.dashboard {
-    display: flex;
-    min-height: 100vh;
-    background: #0a0a0f;
-    color: #e0e0e0;
-    font-family: 'DM Sans', sans-serif;
-}
-
-/* SIDEBAR */
-.sidebar {
-    width: 240px;
-    background: #111118;
-    border-right: 1px solid #1e1e2e;
-    display: flex;
-    flex-direction: column;
-    padding: 28px 20px;
-    position: fixed;
-    height: 100vh;
-}
-
-.sidebar-logo {
-    font-family: 'Syne', sans-serif;
-    font-weight: 800;
-    font-size: 22px;
-    color: #fff;
-    letter-spacing: -0.5px;
-    margin-bottom: 36px;
-    display: flex;
-    align-items: baseline;
-}
-
-.logo-y { color: #FFB400; }
-.logo-sub {
-    font-size: 11px;
-    font-weight: 400;
-    color: #555;
-    margin-left: 4px;
-    letter-spacing: 2px;
-    text-transform: uppercase;
-}
-
-.sidebar-nav { flex: 1; }
-
-.nav-item {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 10px 12px;
-    border-radius: 8px;
-    color: #666;
-    font-size: 14px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.15s;
-    margin-bottom: 4px;
-}
-
-.nav-item:hover { background: #1a1a28; color: #ccc; }
-.nav-item.active { background: rgba(255,180,0,0.1); color: #FFB400; }
-.nav-icon { font-size: 16px; }
-
-.sidebar-user {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 12px;
-    background: #0d0d14;
-    border-radius: 10px;
-    border: 1px solid #1e1e2e;
-}
-
-.user-avatar {
-    width: 32px;
-    height: 32px;
-    background: #FFB400;
-    color: #000;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: 700;
-    font-size: 13px;
-    flex-shrink: 0;
-}
-
-.user-info { flex: 1; min-width: 0; }
-.user-name { font-size: 13px; font-weight: 600; color: #ddd; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.user-role { font-size: 11px; color: #FFB400; text-transform: uppercase; letter-spacing: 0.5px; }
-
-.btn-logout { background: none; border: none; color: #555; cursor: pointer; font-size: 16px; padding: 4px; }
-.btn-logout:hover { color: #ff6b6b; }
-
-/* MAIN */
-.main {
-    margin-left: 240px;
-    flex: 1;
-    padding: 36px 40px;
-    min-width: 0;
-}
-
-.page-header { margin-bottom: 28px; }
-
-h1 {
-    font-family: 'Syne', sans-serif;
-    font-size: 26px;
-    font-weight: 800;
-    color: #fff;
-    margin: 0 0 4px;
-}
-
-.page-sub { font-size: 13px; color: #555; margin: 0; }
-
-/* STATS */
-.stats-row {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 12px;
-    margin-bottom: 28px;
-}
-
-.stat-card {
-    background: #111118;
-    border: 1px solid #1e1e2e;
-    border-radius: 10px;
-    padding: 18px 20px;
-}
-
-.stat-card.success { border-color: rgba(80,200,120,0.2); }
-.stat-card.danger { border-color: rgba(255,60,60,0.2); }
-
-.stat-value {
-    font-family: 'Syne', sans-serif;
-    font-size: 28px;
-    font-weight: 800;
-    color: #fff;
-    line-height: 1;
-    margin-bottom: 6px;
-}
-
-.stat-card.success .stat-value { color: #50c878; }
-.stat-card.danger .stat-value { color: #ff6b6b; }
-
-.stat-label { font-size: 12px; color: #555; }
-
-/* TABS */
-.tabs {
-    display: flex;
-    gap: 4px;
-    margin-bottom: 20px;
-    border-bottom: 1px solid #1e1e2e;
-}
-
-.tab {
-    background: none;
-    border: none;
-    border-bottom: 2px solid transparent;
-    padding: 10px 16px 12px;
-    font-size: 13px;
-    font-weight: 500;
-    color: #555;
-    cursor: pointer;
-    transition: all 0.15s;
-    font-family: 'DM Sans', sans-serif;
-    margin-bottom: -1px;
-}
-
-.tab.active { color: #FFB400; border-bottom-color: #FFB400; }
-.tab:hover:not(.active) { color: #aaa; }
-
-.loading, .empty { color: #444; font-size: 14px; padding: 24px 0; }
-
-/* TABLE */
-.table-wrap { overflow-x: auto; }
-
-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 13px;
-}
-
-thead tr {
-    border-bottom: 1px solid #1e1e2e;
-}
-
-th {
-    text-align: left;
-    padding: 10px 14px;
-    font-size: 11px;
-    font-weight: 600;
-    color: #444;
-    text-transform: uppercase;
-    letter-spacing: 0.8px;
-    white-space: nowrap;
-}
-
-td {
-    padding: 12px 14px;
-    border-bottom: 1px solid #141420;
-    vertical-align: middle;
-}
-
-tr:hover td { background: rgba(255,255,255,0.01); }
-
-.file-cell {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    max-width: 220px;
-}
-
-.file-ico { font-size: 18px; flex-shrink: 0; }
-
-.file-name {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    color: #ccc;
-}
-
-.user-cell {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.mini-avatar {
-    width: 26px;
-    height: 26px;
-    background: #FFB400;
-    color: #000;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: 700;
-    font-size: 11px;
-    flex-shrink: 0;
-}
-
-.cell-name { font-size: 13px; color: #ccc; }
-.cell-sub { font-size: 11px; color: #444; }
-.cell-empty { color: #333; }
-.cell-mono { font-family: monospace; font-size: 12px; color: #666; }
-.cell-date { font-size: 12px; color: #555; white-space: nowrap; }
-.cell-desc { font-size: 12px; color: #666; max-width: 200px; }
-
-.shared-badges { display: flex; flex-wrap: wrap; gap: 4px; }
-
-.badge {
-    background: rgba(255,180,0,0.1);
-    color: #FFB400;
-    border: 1px solid rgba(255,180,0,0.2);
-    border-radius: 4px;
-    padding: 2px 8px;
-    font-size: 11px;
-    white-space: nowrap;
-}
-
-.action-btns { display: flex; gap: 6px; }
-
-.btn-icon {
-    background: #1a1a28;
-    border: 1px solid #2a2a3a;
-    border-radius: 6px;
-    padding: 5px 9px;
-    font-size: 13px;
-    cursor: pointer;
-    transition: all 0.15s;
-}
-.btn-icon:hover { background: #222238; }
-.btn-icon.danger:hover { background: rgba(255,60,60,0.1); border-color: rgba(255,60,60,0.3); }
-
-.status-dot {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 22px;
-    height: 22px;
-    border-radius: 50%;
-    font-size: 11px;
-    font-weight: 700;
-}
-.status-dot.ok { background: rgba(80,200,120,0.15); color: #50c878; }
-.status-dot.fail { background: rgba(255,60,60,0.15); color: #ff6b6b; }
-
-.action-tag {
-    background: #1a1a28;
-    border: 1px solid #2a2a3a;
-    border-radius: 4px;
-    padding: 2px 8px;
-    font-size: 11px;
-    color: #888;
-    font-family: monospace;
-    white-space: nowrap;
-}
-</style>

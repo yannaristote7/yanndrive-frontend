@@ -3,22 +3,17 @@ import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 
 const route = useRoute()
-
-const state = ref('loading')   // loading | password | downloading | error
+const state = ref('loading')
 const errorMsg = ref('')
 const password = ref('')
 const loading = ref(false)
 
-// Reconstruit l'URL signée complète depuis les query params
 const buildUrl = (pwd = null) => {
     const base = `http://localhost:8000/api/public/share/${route.params.token}`
     const params = new URLSearchParams()
-
-    // Recopie les params de signature (expires, signature)
     if (route.query.expires)   params.append('expires', route.query.expires)
     if (route.query.signature) params.append('signature', route.query.signature)
     if (pwd)                   params.append('password', pwd)
-
     return `${base}?${params.toString()}`
 }
 
@@ -26,7 +21,6 @@ const tryAccess = async (pwd = null) => {
     loading.value = true
     try {
         const res = await fetch(buildUrl(pwd))
-
         if (res.status === 403) {
             const data = await res.json()
             if (data.message === 'Password incorrect') {
@@ -41,38 +35,20 @@ const tryAccess = async (pwd = null) => {
             }
             return
         }
+        if (res.status === 404) { state.value = 'error'; errorMsg.value = 'Lien invalide ou introuvable.'; return }
+        if (!res.ok) { state.value = 'error'; errorMsg.value = 'Une erreur est survenue.'; return }
 
-        if (res.status === 404) {
-            state.value = 'error'
-            errorMsg.value = 'Lien invalide ou introuvable.'
-            return
-        }
-
-        if (!res.ok) {
-            state.value = 'error'
-            errorMsg.value = 'Une erreur est survenue.'
-            return
-        }
-
-        // Succès → télécharge le fichier
         state.value = 'downloading'
         const blob = await res.blob()
-        const contentDisposition = res.headers.get('Content-Disposition')
+        const cd = res.headers.get('Content-Disposition')
         let filename = 'document'
-        if (contentDisposition) {
-            const match = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/)
-            if (match) filename = match[1].replace(/['"]/g, '')
-        }
+        if (cd) { const m = cd.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/); if (m) filename = m[1].replace(/['"]/g, '') }
         const url = window.URL.createObjectURL(blob)
         const a = document.createElement('a')
-        a.href = url
-        a.download = filename
-        a.click()
+        a.href = url; a.download = filename; a.click()
         window.URL.revokeObjectURL(url)
-
     } catch (e) {
-        state.value = 'error'
-        errorMsg.value = 'Impossible de contacter le serveur.'
+        state.value = 'error'; errorMsg.value = 'Impossible de contacter le serveur.'
     } finally {
         loading.value = false
     }
@@ -84,255 +60,71 @@ const submitPassword = () => {
     tryAccess(password.value)
 }
 
-onMounted(() => {
-    tryAccess()
-})
+onMounted(() => tryAccess())
 </script>
 
 <template>
-<div class="share-page">
-    <div class="share-card">
+<div class="min-h-screen bg-[#09090f] flex items-center justify-center px-4"
+     style="background-image: radial-gradient(ellipse at 20% 50%, rgba(255,180,0,0.07) 0%, transparent 60%), radial-gradient(ellipse at 80% 20%, rgba(255,100,0,0.05) 0%, transparent 50%)">
 
-        <div class="logo">
-            <span class="logo-y">Y</span>AMS
-            <span class="logo-sub">Drive</span>
-        </div>
+    <div class="w-full max-w-md">
+        <div class="bg-[#111118] border border-[#222230] rounded-2xl p-12 shadow-[0_32px_80px_rgba(0,0,0,0.5)] text-center">
 
-        <!-- LOADING -->
-        <div v-if="state === 'loading'" class="state-block">
-            <div class="big-spinner"></div>
-            <p>Vérification du lien...</p>
-        </div>
-
-        <!-- MOT DE PASSE REQUIS -->
-        <div v-else-if="state === 'password'" class="state-block">
-            <div class="state-icon">🔒</div>
-            <h2>Document protégé</h2>
-            <p>Ce document est protégé par un mot de passe.</p>
-
-            <div v-if="errorMsg" class="alert-error">{{ errorMsg }}</div>
-
-            <div class="field">
-                <label>Mot de passe</label>
-                <input
-                    v-model="password"
-                    type="password"
-                    placeholder="Entrez le mot de passe"
-                    @keyup.enter="submitPassword"
-                    autofocus
-                />
+            <!-- LOGO -->
+            <div class="flex items-baseline justify-center gap-1 mb-10">
+                <span class="font-black text-2xl tracking-tight text-white" style="font-family:'Syne',sans-serif">
+                    <span class="text-[#FFB400]">Y</span>AMS
+                </span>
+                <span class="text-[10px] text-[#555] ml-1 tracking-[3px] uppercase">Drive</span>
             </div>
 
-            <button class="btn-primary" @click="submitPassword" :disabled="loading || !password">
-                <span v-if="loading" class="spinner"></span>
-                <span v-else>Accéder au document</span>
-            </button>
-        </div>
+            <!-- LOADING -->
+            <div v-if="state === 'loading'" class="flex flex-col items-center gap-4">
+                <div class="w-12 h-12 border-[3px] border-[#1e1e2e] border-t-[#FFB400] rounded-full animate-spin"></div>
+                <p class="text-[#555] text-sm">Vérification du lien...</p>
+            </div>
 
-        <!-- TÉLÉCHARGEMENT EN COURS -->
-        <div v-else-if="state === 'downloading'" class="state-block">
-            <div class="state-icon success">✓</div>
-            <h2>Téléchargement lancé !</h2>
-            <p>Votre document est en cours de téléchargement.</p>
-        </div>
+            <!-- PASSWORD -->
+            <div v-else-if="state === 'password'" class="flex flex-col items-center gap-4">
+                <div class="w-14 h-14 rounded-full bg-[rgba(255,180,0,0.1)] border border-[rgba(255,180,0,0.2)] flex items-center justify-center text-2xl">🔒</div>
+                <h2 class="text-xl font-bold text-white" style="font-family:'Syne',sans-serif">Document protégé</h2>
+                <p class="text-[#555] text-sm">Ce document est protégé par un mot de passe.</p>
 
-        <!-- ERREUR -->
-        <div v-else-if="state === 'error'" class="state-block">
-            <div class="state-icon error">✕</div>
-            <h2>Accès impossible</h2>
-            <p>{{ errorMsg }}</p>
-        </div>
+                <div v-if="errorMsg" class="w-full px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm text-left">
+                    {{ errorMsg }}
+                </div>
 
-        <div class="footer-note">
-            Partagé via <strong>YAMS Drive</strong>
-        </div>
+                <div class="w-full text-left">
+                    <label class="block text-[11px] font-medium text-[#666] uppercase tracking-[1px] mb-2">Mot de passe</label>
+                    <input v-model="password" type="password" placeholder="Entrez le mot de passe" @keyup.enter="submitPassword" autofocus
+                        class="w-full bg-[#0d0d14] border border-[#222230] rounded-lg px-4 py-3 text-white text-sm placeholder-[#333] focus:outline-none focus:border-[#FFB400] transition-colors" />
+                </div>
 
+                <button @click="submitPassword" :disabled="loading || !password"
+                    class="w-full bg-[#FFB400] hover:bg-[#ffc933] disabled:opacity-50 disabled:cursor-not-allowed text-black font-bold rounded-lg py-4 text-sm flex items-center justify-center gap-2 transition-colors"
+                    style="font-family:'Syne',sans-serif">
+                    <span v-if="loading" class="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin"></span>
+                    <span v-else>Accéder au document</span>
+                </button>
+            </div>
+
+            <!-- SUCCESS -->
+            <div v-else-if="state === 'downloading'" class="flex flex-col items-center gap-4">
+                <div class="w-14 h-14 rounded-full bg-green-500/10 border border-green-500/20 flex items-center justify-center text-green-400 text-2xl font-bold">✓</div>
+                <h2 class="text-xl font-bold text-white" style="font-family:'Syne',sans-serif">Téléchargement lancé !</h2>
+                <p class="text-[#555] text-sm">Votre document est en cours de téléchargement.</p>
+            </div>
+
+            <!-- ERROR -->
+            <div v-else-if="state === 'error'" class="flex flex-col items-center gap-4">
+                <div class="w-14 h-14 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400 text-2xl font-bold">✕</div>
+                <h2 class="text-xl font-bold text-white" style="font-family:'Syne',sans-serif">Accès impossible</h2>
+                <p class="text-[#555] text-sm">{{ errorMsg }}</p>
+            </div>
+
+            <p class="mt-10 text-xs text-[#333]">Partagé via <strong class="text-[#444]">YAMS Drive</strong></p>
+
+        </div>
     </div>
 </div>
 </template>
-
-<style scoped>
-@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap');
-
-* { box-sizing: border-box; }
-
-.share-page {
-    min-height: 100vh;
-    background: #0a0a0f;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-family: 'DM Sans', sans-serif;
-    padding: 20px;
-    background-image:
-        radial-gradient(ellipse at 20% 50%, rgba(255,180,0,0.07) 0%, transparent 60%),
-        radial-gradient(ellipse at 80% 20%, rgba(255,100,0,0.05) 0%, transparent 50%);
-}
-
-.share-card {
-    background: #111118;
-    border: 1px solid #222230;
-    border-radius: 16px;
-    padding: 48px 40px;
-    width: 100%;
-    max-width: 420px;
-    box-shadow: 0 32px 80px rgba(0,0,0,0.5);
-    text-align: center;
-}
-
-.logo {
-    font-family: 'Syne', sans-serif;
-    font-weight: 800;
-    font-size: 24px;
-    color: #fff;
-    margin-bottom: 36px;
-    display: flex;
-    align-items: baseline;
-    justify-content: center;
-    gap: 2px;
-}
-
-.logo-y { color: #FFB400; }
-.logo-sub {
-    font-size: 11px;
-    font-weight: 400;
-    color: #555;
-    margin-left: 4px;
-    letter-spacing: 2px;
-    text-transform: uppercase;
-}
-
-.state-block {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 12px;
-}
-
-.state-icon {
-    width: 56px;
-    height: 56px;
-    border-radius: 50%;
-    background: rgba(255,180,0,0.1);
-    border: 1px solid rgba(255,180,0,0.2);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 24px;
-    margin-bottom: 4px;
-}
-
-.state-icon.success {
-    background: rgba(80,200,120,0.1);
-    border-color: rgba(80,200,120,0.2);
-    color: #50c878;
-    font-size: 28px;
-    font-weight: 700;
-}
-
-.state-icon.error {
-    background: rgba(255,60,60,0.1);
-    border-color: rgba(255,60,60,0.2);
-    color: #ff6b6b;
-    font-size: 28px;
-    font-weight: 700;
-}
-
-h2 {
-    font-family: 'Syne', sans-serif;
-    font-size: 20px;
-    font-weight: 700;
-    color: #fff;
-    margin: 0;
-}
-
-p { font-size: 14px; color: #555; margin: 0; line-height: 1.6; }
-
-.alert-error {
-    background: rgba(255,60,60,0.1);
-    border: 1px solid rgba(255,60,60,0.3);
-    color: #ff6b6b;
-    padding: 10px 16px;
-    border-radius: 8px;
-    font-size: 13px;
-    width: 100%;
-    text-align: left;
-}
-
-.field {
-    width: 100%;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    text-align: left;
-}
-
-label {
-    font-size: 11px;
-    font-weight: 500;
-    color: #666;
-    text-transform: uppercase;
-    letter-spacing: 0.8px;
-}
-
-input {
-    width: 100%;
-    background: #0d0d14;
-    border: 1px solid #222230;
-    border-radius: 8px;
-    padding: 12px 16px;
-    color: #fff;
-    font-size: 15px;
-    font-family: 'DM Sans', sans-serif;
-    transition: border-color 0.2s;
-}
-input:focus { outline: none; border-color: #FFB400; }
-input::placeholder { color: #333; }
-
-.btn-primary {
-    width: 100%;
-    background: #FFB400;
-    color: #000;
-    border: none;
-    border-radius: 8px;
-    padding: 13px;
-    font-size: 15px;
-    font-weight: 700;
-    font-family: 'Syne', sans-serif;
-    cursor: pointer;
-    transition: background 0.15s;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-}
-.btn-primary:hover:not(:disabled) { background: #ffc933; }
-.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
-
-.big-spinner {
-    width: 40px;
-    height: 40px;
-    border: 3px solid #1e1e2e;
-    border-top-color: #FFB400;
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
-    margin-bottom: 8px;
-}
-
-.spinner {
-    width: 14px;
-    height: 14px;
-    border: 2px solid rgba(0,0,0,0.3);
-    border-top-color: #000;
-    border-radius: 50%;
-    animation: spin 0.7s linear infinite;
-}
-
-@keyframes spin { to { transform: rotate(360deg); } }
-
-.footer-note {
-    margin-top: 32px;
-    font-size: 12px;
-    color: #333;
-}
-</style>

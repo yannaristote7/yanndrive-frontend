@@ -13,25 +13,13 @@ const file = ref(null)
 const loading = ref(true)
 const uploading = ref(false)
 
-// Partage
 const shareModal = ref(false)
 const selectedDoc = ref(null)
-const shareEmail = ref('')        // ← email au lieu de ID
+const shareEmail = ref('')
 const shareTab = ref('user')
 const publicLinkResult = ref(null)
-const linkForm = ref({
-    permission: 'read',
-    allow_download: true,
-    expires_in_days: 7,
-    password: '',
-    email: ''
-})
+const linkForm = ref({ permission: 'read', allow_download: true, expires_in_days: 7, password: '', email: '' })
 
-/*
-========================================
-FETCH
-========================================
-*/
 const fetchDocuments = async () => {
     try {
         const res = await api.get('/api/documents')
@@ -42,24 +30,14 @@ const fetchDocuments = async () => {
             documents.value = res.data.owned_documents || []
             sharedDocuments.value = res.data.shared_documents || []
         }
-    } catch (e) {
-        console.error(e.response?.data)
-    } finally {
-        loading.value = false
-    }
+    } catch (e) { console.error(e.response?.data) }
+    finally { loading.value = false }
 }
 
-/*
-========================================
-UPLOAD
-========================================
-*/
-const handleFileChange = (e) => {
-    file.value = e.target.files[0]
-}
+const handleFileChange = (e) => { file.value = e.target.files[0] }
 
 const uploadDocument = async () => {
-    if (!file.value) return alert('Choisir un fichier')
+    if (!file.value) return
     uploading.value = true
     const formData = new FormData()
     formData.append('file', file.value)
@@ -68,779 +46,270 @@ const uploadDocument = async () => {
         file.value = null
         document.getElementById('fileInput').value = ''
         await fetchDocuments()
-    } catch (e) {
-        alert(e.response?.data?.message || 'Erreur upload')
-    } finally {
-        uploading.value = false
-    }
+    } catch (e) { alert(e.response?.data?.message || 'Erreur upload') }
+    finally { uploading.value = false }
 }
 
-/*
-========================================
-DELETE
-========================================
-*/
 const deleteDocument = async (id) => {
     if (!confirm('Supprimer ce document ?')) return
-    try {
-        await api.delete(`/api/documents/${id}`)
-        await fetchDocuments()
-    } catch (e) {
-        alert(e.response?.data?.message || 'Erreur suppression')
-    }
+    try { await api.delete(`/api/documents/${id}`); await fetchDocuments() }
+    catch (e) { alert(e.response?.data?.message || 'Erreur suppression') }
 }
 
-/*
-========================================
-DOWNLOAD
-========================================
-*/
 const downloadDocument = async (id, name) => {
     try {
-        const res = await api.get(`/api/documents/${id}/download`, {
-            responseType: 'blob'
-        })
+        const res = await api.get(`/api/documents/${id}/download`, { responseType: 'blob' })
         const url = window.URL.createObjectURL(new Blob([res.data]))
-        const a = document.createElement('a')
-        a.href = url
-        a.download = name
-        a.click()
+        const a = document.createElement('a'); a.href = url; a.download = name; a.click()
         window.URL.revokeObjectURL(url)
-    } catch (e) {
-        alert('Erreur téléchargement')
-    }
+    } catch (e) { alert('Erreur téléchargement') }
 }
 
-/*
-========================================
-PARTAGE MODAL
-========================================
-*/
-const openShare = (doc) => {
-    selectedDoc.value = doc
-    shareEmail.value = ''
-    publicLinkResult.value = null
-    shareTab.value = 'user'
-    shareModal.value = true
-}
-
-const closeShare = () => {
-    shareModal.value = false
-    selectedDoc.value = null
-}
+const openShare = (doc) => { selectedDoc.value = doc; shareEmail.value = ''; publicLinkResult.value = null; shareTab.value = 'user'; shareModal.value = true }
+const closeShare = () => { shareModal.value = false; selectedDoc.value = null }
 
 const shareWithUser = async () => {
     if (!shareEmail.value) return
     try {
-        await api.post(`/api/documents/${selectedDoc.value.id}/share`, {
-            email: shareEmail.value    // ← envoie email
-        })
-        alert('Document partagé avec succès !')
+        await api.post(`/api/documents/${selectedDoc.value.id}/share`, { email: shareEmail.value })
         shareEmail.value = ''
         await fetchDocuments()
-        // Rafraîchit le doc sélectionné pour voir la liste màj
         selectedDoc.value = documents.value.find(d => d.id === selectedDoc.value.id)
-    } catch (e) {
-        alert(e.response?.data?.message || 'Erreur partage')
-    }
+    } catch (e) { alert(e.response?.data?.message || 'Erreur partage') }
 }
 
 const generateLink = async () => {
     try {
         const res = await api.post(`/api/documents/${selectedDoc.value.id}/public-link`, {
-            permission:      linkForm.value.permission,
-            allow_download:  linkForm.value.allow_download,
+            permission: linkForm.value.permission,
+            allow_download: linkForm.value.allow_download,
             expires_in_days: linkForm.value.expires_in_days,
-            password:        linkForm.value.password || null,
-            email:           linkForm.value.email || null
+            password: linkForm.value.password || null,
+            email: linkForm.value.email || null
         })
-
-        // Extrait le token et les params de l'URL signée
         const url = new URL(res.data.public_url)
         const token = url.pathname.split('/').pop()
         const expires = url.searchParams.get('expires')
         const signature = url.searchParams.get('signature')
-
-        // Génère l'URL frontend
         publicLinkResult.value = `http://localhost:5173/share/${token}?expires=${expires}&signature=${signature}`
-
-    } catch (e) {
-        alert(e.response?.data?.message || 'Erreur génération lien')
-    }
+    } catch (e) { alert(e.response?.data?.message || 'Erreur génération lien') }
 }
 
-const copyLink = () => {
-    navigator.clipboard.writeText(publicLinkResult.value)
-    alert('Lien copié !')
-}
+const copyLink = () => { navigator.clipboard.writeText(publicLinkResult.value); alert('Lien copié !') }
 
-/*
-========================================
-LOGOUT
-========================================
-*/
 const logout = async () => {
     await api.post('/api/logout')
-    localStorage.removeItem('token')
-    localStorage.removeItem('user')
+    localStorage.removeItem('token'); localStorage.removeItem('user')
     router.push('/login')
 }
 
-/*
-========================================
-UTILS
-========================================
-*/
-const formatSize = (bytes) => {
-    if (!bytes) return '—'
-    if (bytes < 1024) return bytes + ' B'
-    if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB'
-    return (bytes / 1048576).toFixed(1) + ' MB'
-}
+const formatSize = (b) => { if (!b) return '—'; if (b < 1024) return b + ' B'; if (b < 1048576) return (b/1024).toFixed(1)+' KB'; return (b/1048576).toFixed(1)+' MB' }
+const formatDate = (d) => new Date(d).toLocaleDateString('fr-FR', { day:'2-digit', month:'short', year:'numeric' })
+const fileIcon = (m) => { if (!m) return '📄'; if (m.includes('pdf')) return '📕'; if (m.includes('image')) return '🖼️'; if (m.includes('word')||m.includes('document')) return '📝'; if (m.includes('sheet')||m.includes('excel')) return '📊'; if (m.includes('zip')) return '📦'; return '📄' }
 
-const formatDate = (d) => new Date(d).toLocaleDateString('fr-FR', {
-    day: '2-digit', month: 'short', year: 'numeric'
-})
-
-const fileIcon = (mime) => {
-    if (!mime) return '📄'
-    if (mime.includes('pdf')) return '📕'
-    if (mime.includes('image')) return '🖼️'
-    if (mime.includes('word') || mime.includes('document')) return '📝'
-    if (mime.includes('sheet') || mime.includes('excel')) return '📊'
-    if (mime.includes('zip')) return '📦'
-    return '📄'
-}
+const inputClass = "w-full bg-[#0d0d14] border border-[#222230] rounded-lg px-3 py-2.5 text-white text-sm placeholder-[#333] focus:outline-none focus:border-[#FFB400] transition-colors"
 
 onMounted(fetchDocuments)
 </script>
 
 <template>
-<div class="dashboard">
+<div class="min-h-screen bg-[#09090f] text-[#e0e0e0]" style="display:flex;"
 
     <!-- SIDEBAR -->
-    <aside class="sidebar">
-        <div class="sidebar-logo">
-            <span class="logo-y">Y</span>ANN
-            <span class="logo-sub">Drive</span>
+    <aside class="w-60 bg-[#111118] border-r border-[#1e1e2e] flex flex-col p-5 fixed h-screen">
+        <div class="flex items-baseline gap-1 mb-9">
+            <span class="font-black text-xl tracking-tight text-white" style="font-family:'Syne',sans-serif">
+                <span class="text-[#FFB400]">Y</span>AMS
+            </span>
+            <span class="text-[10px] text-[#555] ml-1 tracking-[3px] uppercase">Drive</span>
         </div>
 
-        <nav class="sidebar-nav">
-            <a class="nav-item active">
-                <span class="nav-icon">📁</span> Mes fichiers
+        <nav class="flex-1 space-y-1">
+            <a class="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium cursor-pointer bg-[rgba(255,180,0,0.1)] text-[#FFB400]">
+                <span>📁</span> Mes fichiers
             </a>
-            <a class="nav-item" v-if="isAdmin" @click="router.push('/admin')">
-                <span class="nav-icon">🛡️</span> Administration
+            <a v-if="isAdmin" @click="router.push('/admin')"
+                class="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium cursor-pointer text-[#666] hover:bg-[#1a1a28] hover:text-[#ccc] transition-all">
+                <span>🛡️</span> Administration
             </a>
         </nav>
 
-        <div class="sidebar-user">
-            <div class="user-avatar">{{ user?.name?.charAt(0) }}</div>
-            <div class="user-info">
-                <div class="user-name">{{ user?.name }}</div>
-                <div class="user-role">{{ user?.role?.name }}</div>
+        <div class="flex items-center gap-2.5 p-3 bg-[#0d0d14] rounded-xl border border-[#1e1e2e]">
+            <div class="w-8 h-8 bg-[#FFB400] text-black rounded-full flex items-center justify-center font-bold text-sm shrink-0">
+                {{ user?.name?.charAt(0) }}
             </div>
-            <button class="btn-logout" @click="logout" title="Déconnexion">↩</button>
+            <div class="flex-1 min-w-0">
+                <div class="text-xs font-semibold text-[#ddd] truncate">{{ user?.name }}</div>
+                <div class="text-[10px] text-[#555] uppercase tracking-wide">{{ user?.role?.name }}</div>
+            </div>
+            <button @click="logout" class="text-[#555] hover:text-red-400 transition-colors text-base ml-1">↩</button>
         </div>
     </aside>
 
     <!-- MAIN -->
-    <main class="main">
+    <main class="flex-1 p-10" style="margin-left: 240px;">
 
         <!-- HEADER -->
-        <div class="page-header">
+        <div class="flex items-start justify-between mb-10 gap-5 flex-wrap">
             <div>
-                <h1>Mes documents</h1>
-                <p class="page-sub">{{ documents.length }} fichier(s) • {{ sharedDocuments.length }} partagé(s) avec moi</p>
+                <h1 class="text-2xl font-black text-white mb-1" style="font-family:'Syne',sans-serif">Mes documents</h1>
+                <p class="text-xs text-[#555]">{{ documents.length }} fichier(s) • {{ sharedDocuments.length }} partagé(s) avec moi</p>
             </div>
 
-            <!-- UPLOAD ZONE -->
-            <div class="upload-zone">
-                <input
-                    id="fileInput"
-                    type="file"
-                    accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx,.txt,.zip"
-                    @change="handleFileChange"
-                    style="display:none"
-                />
-                <label for="fileInput" class="btn-choose">
+            <!-- UPLOAD -->
+            <div class="flex items-center gap-2.5">
+                <input id="fileInput" type="file" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx,.txt,.zip" @change="handleFileChange" class="hidden" />
+                <label for="fileInput"
+                    class="bg-[#1a1a28] border border-dashed border-[#333] hover:border-[#FFB400] hover:text-[#FFB400] text-[#aaa] rounded-lg px-4 py-2.5 text-xs cursor-pointer transition-all truncate max-w-[180px]">
                     {{ file ? file.name : '+ Choisir un fichier' }}
                 </label>
-                <button class="btn-upload" @click="uploadDocument" :disabled="!file || uploading">
-                    <span v-if="uploading" class="spinner"></span>
+                <button @click="uploadDocument" :disabled="!file || uploading"
+                    class="bg-[#FFB400] hover:bg-[#ffc933] disabled:opacity-50 disabled:cursor-not-allowed text-black font-bold rounded-lg px-5 py-2.5 text-xs flex items-center gap-2 transition-colors whitespace-nowrap"
+                    style="font-family:'Syne',sans-serif">
+                    <span v-if="uploading" class="w-3 h-3 border-2 border-black/30 border-t-black rounded-full animate-spin"></span>
                     <span v-else>Uploader</span>
                 </button>
             </div>
         </div>
 
-        <!-- MES DOCUMENTS -->
-        <section class="section">
-            <h2 class="section-title">Mes fichiers</h2>
+        <!-- MES FICHIERS -->
+        <section class="mb-10">
+            <h2 class="text-[11px] font-bold text-[#555] uppercase tracking-[2px] mb-4" style="font-family:'Syne',sans-serif">Mes fichiers</h2>
 
-            <div v-if="loading" class="loading">Chargement...</div>
+            <div v-if="loading" class="text-[#444] text-sm py-6">Chargement...</div>
+            <div v-else-if="documents.length === 0" class="text-[#444] text-sm py-6">Aucun document. Uploadez votre premier fichier !</div>
 
-            <div v-else-if="documents.length === 0" class="empty">
-                Aucun document. Uploadez votre premier fichier !
-            </div>
-
-            <div v-else class="doc-grid">
-                <div class="doc-card" v-for="doc in documents" :key="doc.id">
-                    <div class="doc-icon">{{ fileIcon(doc.mime_type) }}</div>
-                    <div class="doc-info">
-                        <div class="doc-name" :title="doc.name">{{ doc.name }}</div>
-                        <div class="doc-meta">{{ formatSize(doc.size) }} • {{ formatDate(doc.created_at) }}</div>
-                        <div class="doc-shared" v-if="doc.shared_with?.length">
+            <div v-else class="space-y-2">
+                <div v-for="doc in documents" :key="doc.id"
+                    class="flex items-center gap-4 bg-[#111118] border border-[#1e1e2e] hover:border-[#2e2e44] rounded-xl px-5 py-4 transition-colors">
+                    <span class="text-2xl shrink-0">{{ fileIcon(doc.mime_type) }}</span>
+                    <div class="flex-1 min-w-0">
+                        <div class="text-sm font-medium text-[#ddd] truncate">{{ doc.name }}</div>
+                        <div class="text-xs text-[#555] mt-0.5">{{ formatSize(doc.size) }} • {{ formatDate(doc.created_at) }}</div>
+                        <div v-if="doc.shared_with?.length" class="text-[11px] text-[#FFB400] mt-0.5">
                             Partagé avec {{ doc.shared_with.length }} personne(s)
                         </div>
                     </div>
-                    <div class="doc-actions">
-                        <button class="btn-icon" @click="downloadDocument(doc.id, doc.name)" title="Télécharger">⬇</button>
-                        <button class="btn-icon" @click="openShare(doc)" title="Partager">🔗</button>
-                        <button class="btn-icon danger" @click="deleteDocument(doc.id)" title="Supprimer">🗑</button>
+                    <div class="flex gap-1.5 shrink-0">
+                        <button @click="downloadDocument(doc.id, doc.name)"
+                            class="bg-[#1a1a28] border border-[#2a2a3a] hover:bg-[#222238] hover:border-[#444] rounded-md px-2.5 py-1.5 text-sm transition-all">⬇</button>
+                        <button @click="openShare(doc)"
+                            class="bg-[#1a1a28] border border-[#2a2a3a] hover:bg-[#222238] hover:border-[#444] rounded-md px-2.5 py-1.5 text-sm transition-all">🔗</button>
+                        <button @click="deleteDocument(doc.id)"
+                            class="bg-[#1a1a28] border border-[#2a2a3a] hover:bg-red-500/10 hover:border-red-500/30 rounded-md px-2.5 py-1.5 text-sm transition-all">🗑</button>
                     </div>
                 </div>
             </div>
         </section>
 
         <!-- PARTAGÉS AVEC MOI -->
-        <section class="section" v-if="sharedDocuments.length > 0">
-            <h2 class="section-title">Partagés avec moi</h2>
-            <div class="doc-grid">
-                <div class="doc-card shared" v-for="doc in sharedDocuments" :key="doc.id">
-                    <div class="doc-icon">{{ fileIcon(doc.mime_type) }}</div>
-                    <div class="doc-info">
-                        <div class="doc-name">{{ doc.name }}</div>
-                        <div class="doc-meta">Par {{ doc.user?.name }} • {{ formatDate(doc.created_at) }}</div>
+        <section v-if="sharedDocuments.length > 0">
+            <h2 class="text-[11px] font-bold text-[#555] uppercase tracking-[2px] mb-4" style="font-family:'Syne',sans-serif">Partagés avec moi</h2>
+            <div class="space-y-2">
+                <div v-for="doc in sharedDocuments" :key="doc.id"
+                    class="flex items-center gap-4 bg-[#111118] border-l-2 border-l-[#FFB400] border border-[#1e1e2e] rounded-xl px-5 py-4">
+                    <span class="text-2xl shrink-0">{{ fileIcon(doc.mime_type) }}</span>
+                    <div class="flex-1 min-w-0">
+                        <div class="text-sm font-medium text-[#ddd] truncate">{{ doc.name }}</div>
+                        <div class="text-xs text-[#555] mt-0.5">Par {{ doc.user?.name }} • {{ formatDate(doc.created_at) }}</div>
                     </div>
-                    <div class="doc-actions">
-                        <button class="btn-icon" @click="downloadDocument(doc.id, doc.name)" title="Télécharger">⬇</button>
-                    </div>
+                    <button @click="downloadDocument(doc.id, doc.name)"
+                        class="bg-[#1a1a28] border border-[#2a2a3a] hover:bg-[#222238] rounded-md px-2.5 py-1.5 text-sm transition-all shrink-0">⬇</button>
                 </div>
             </div>
         </section>
-
     </main>
 
     <!-- MODAL PARTAGE -->
-    <div class="modal-overlay" v-if="shareModal" @click.self="closeShare">
-        <div class="modal">
-            <div class="modal-header">
-                <h3>Partager « {{ selectedDoc?.name }} »</h3>
-                <button class="modal-close" @click="closeShare">✕</button>
+    <div v-if="shareModal" @click.self="closeShare"
+        class="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 px-4">
+        <div class="bg-[#111118] border border-[#222230] rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+
+            <div class="flex items-center justify-between px-6 py-5 border-b border-[#1e1e2e]">
+                <h3 class="text-base font-bold text-white truncate max-w-[340px]" style="font-family:'Syne',sans-serif">
+                    Partager « {{ selectedDoc?.name }} »
+                </h3>
+                <button @click="closeShare" class="text-[#555] hover:text-white text-lg transition-colors ml-3">✕</button>
             </div>
 
-            <div class="modal-tabs">
-                <button :class="['tab', shareTab === 'user' && 'active']" @click="shareTab = 'user'">
-                    Utilisateur interne
-                </button>
-                <button :class="['tab', shareTab === 'link' && 'active']" @click="shareTab = 'link'">
-                    Lien public
+            <!-- TABS -->
+            <div class="flex px-6 pt-4 gap-2 border-b border-[#1e1e2e]">
+                <button v-for="tab in [{id:'user',label:'Utilisateur interne'},{id:'link',label:'Lien public'}]" :key="tab.id"
+                    @click="shareTab = tab.id"
+                    :class="['pb-3 text-sm font-medium border-b-2 transition-all', shareTab === tab.id ? 'text-[#FFB400] border-[#FFB400]' : 'text-[#555] border-transparent hover:text-[#aaa]']">
+                    {{ tab.label }}
                 </button>
             </div>
 
-            <!-- TAB : PARTAGE UTILISATEUR -->
-            <div v-if="shareTab === 'user'" class="modal-body">
-                <div class="field">
-                    <label>Email de l'utilisateur</label>
-                    <input
-                        v-model="shareEmail"
-                        type="email"
-                        placeholder="alice@yamslogistics.com"
-                        @keyup.enter="shareWithUser"
-                    />
+            <!-- TAB USER -->
+            <div v-if="shareTab === 'user'" class="px-6 py-5 space-y-4">
+                <div>
+                    <label class="block text-[11px] font-medium text-[#666] uppercase tracking-[1px] mb-2">Email de l'utilisateur</label>
+                    <input v-model="shareEmail" type="email" placeholder="alice@yamslogistics.com" @keyup.enter="shareWithUser" :class="inputClass" />
                 </div>
-                <button class="btn-primary" @click="shareWithUser">Partager</button>
+                <button @click="shareWithUser"
+                    class="w-full bg-[#FFB400] hover:bg-[#ffc933] text-black font-bold rounded-lg py-3 text-sm transition-colors"
+                    style="font-family:'Syne',sans-serif">Partager</button>
 
-                <!-- Liste des utilisateurs déjà partagés -->
-                <div v-if="selectedDoc?.shared_with?.length" class="shared-list">
-                    <p class="shared-list-title">Déjà partagé avec :</p>
-                    <div class="shared-user" v-for="u in selectedDoc.shared_with" :key="u.id">
-                        <span class="shared-avatar">{{ u.name?.charAt(0) }}</span>
+                <div v-if="selectedDoc?.shared_with?.length" class="pt-2">
+                    <p class="text-xs text-[#555] mb-3">Déjà partagé avec :</p>
+                    <div v-for="u in selectedDoc.shared_with" :key="u.id"
+                        class="flex items-center gap-2.5 py-2 border-b border-[#1a1a28]">
+                        <div class="w-7 h-7 bg-[#FFB400] text-black rounded-full flex items-center justify-center font-bold text-xs shrink-0">
+                            {{ u.name?.charAt(0) }}
+                        </div>
                         <div>
-                            <div>{{ u.name }}</div>
-                            <small>{{ u.email }}</small>
+                            <div class="text-sm text-[#aaa]">{{ u.name }}</div>
+                            <div class="text-xs text-[#444]">{{ u.email }}</div>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- TAB : LIEN PUBLIC -->
-            <div v-if="shareTab === 'link'" class="modal-body">
-                <div class="field-row">
-                    <div class="field">
-                        <label>Permission</label>
-                        <select v-model="linkForm.permission">
+            <!-- TAB LINK -->
+            <div v-if="shareTab === 'link'" class="px-6 py-5 space-y-4">
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-[11px] font-medium text-[#666] uppercase tracking-[1px] mb-2">Permission</label>
+                        <select v-model="linkForm.permission" :class="inputClass">
                             <option value="read">Lecture seule</option>
                             <option value="edit">Édition</option>
                         </select>
                     </div>
-                    <div class="field">
-                        <label>Expire dans (jours)</label>
-                        <input v-model="linkForm.expires_in_days" type="number" min="1" max="30" />
+                    <div>
+                        <label class="block text-[11px] font-medium text-[#666] uppercase tracking-[1px] mb-2">Expire (jours)</label>
+                        <input v-model="linkForm.expires_in_days" type="number" min="1" max="30" :class="inputClass" />
                     </div>
                 </div>
-
-                <div class="field">
-                    <label>Envoyer par email (optionnel)</label>
-                    <input v-model="linkForm.email" type="email" placeholder="contact@externe.com" />
+                <div>
+                    <label class="block text-[11px] font-medium text-[#666] uppercase tracking-[1px] mb-2">Email (optionnel)</label>
+                    <input v-model="linkForm.email" type="email" placeholder="contact@externe.com" :class="inputClass" />
                 </div>
-
-                <div class="field">
-                    <label>Mot de passe (optionnel)</label>
-                    <input v-model="linkForm.password" type="password" placeholder="Protéger le lien" />
+                <div>
+                    <label class="block text-[11px] font-medium text-[#666] uppercase tracking-[1px] mb-2">Mot de passe (optionnel)</label>
+                    <input v-model="linkForm.password" type="password" placeholder="Protéger le lien" :class="inputClass" />
                 </div>
+                <label class="flex items-center gap-2.5 cursor-pointer">
+                    <input type="checkbox" v-model="linkForm.allow_download" class="accent-[#FFB400]" />
+                    <span class="text-sm text-[#aaa]">Autoriser le téléchargement</span>
+                </label>
 
-                <div class="field-check">
-                    <input type="checkbox" id="allowDl" v-model="linkForm.allow_download" />
-                    <label for="allowDl" style="text-transform:none;font-size:14px;letter-spacing:0">
-                        Autoriser le téléchargement
-                    </label>
-                </div>
+                <button @click="generateLink"
+                    class="w-full bg-[#FFB400] hover:bg-[#ffc933] text-black font-bold rounded-lg py-3 text-sm transition-colors"
+                    style="font-family:'Syne',sans-serif">Générer le lien</button>
 
-                <button class="btn-primary" @click="generateLink">Générer le lien</button>
-
-                <div v-if="publicLinkResult" class="link-result">
-                    <p class="link-label">Lien généré :</p>
-                    <div class="link-box">
-                        <span class="link-text">{{ publicLinkResult }}</span>
-                        <button class="btn-copy" @click="copyLink">Copier</button>
+                <div v-if="publicLinkResult" class="bg-[#0d0d14] border border-[#222230] rounded-lg p-4">
+                    <p class="text-[10px] text-[#555] uppercase tracking-[1px] mb-2">Lien généré</p>
+                    <div class="flex items-center gap-2">
+                        <span class="text-[11px] text-[#FFB400] break-all flex-1">{{ publicLinkResult }}</span>
+                        <button @click="copyLink"
+                            class="bg-[#1a1a28] border border-[#333] hover:border-[#FFB400] hover:text-[#FFB400] text-[#aaa] rounded-md px-3 py-1.5 text-xs transition-all shrink-0">
+                            Copier
+                        </button>
                     </div>
                 </div>
             </div>
         </div>
     </div>
-
 </div>
 </template>
-
-<style scoped>
-@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap');
-
-* { box-sizing: border-box; }
-
-.dashboard {
-    display: flex;
-    min-height: 100vh;
-    background: #0a0a0f;
-    color: #e0e0e0;
-    font-family: 'DM Sans', sans-serif;
-}
-
-.sidebar {
-    width: 240px;
-    background: #111118;
-    border-right: 1px solid #1e1e2e;
-    display: flex;
-    flex-direction: column;
-    padding: 28px 20px;
-    position: fixed;
-    height: 100vh;
-}
-
-.sidebar-logo {
-    font-family: 'Syne', sans-serif;
-    font-weight: 800;
-    font-size: 22px;
-    color: #fff;
-    letter-spacing: -0.5px;
-    margin-bottom: 36px;
-    display: flex;
-    align-items: baseline;
-    gap: 2px;
-}
-
-.logo-y { color: #FFB400; }
-.logo-sub {
-    font-size: 11px;
-    font-weight: 400;
-    color: #555;
-    margin-left: 4px;
-    letter-spacing: 2px;
-    text-transform: uppercase;
-}
-
-.sidebar-nav { flex: 1; }
-
-.nav-item {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 10px 12px;
-    border-radius: 8px;
-    color: #666;
-    font-size: 14px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.15s;
-    margin-bottom: 4px;
-    text-decoration: none;
-}
-
-.nav-item:hover { background: #1a1a28; color: #ccc; }
-.nav-item.active { background: rgba(255,180,0,0.1); color: #FFB400; }
-.nav-icon { font-size: 16px; }
-
-.sidebar-user {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 12px;
-    background: #0d0d14;
-    border-radius: 10px;
-    border: 1px solid #1e1e2e;
-}
-
-.user-avatar {
-    width: 32px;
-    height: 32px;
-    background: #FFB400;
-    color: #000;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: 700;
-    font-size: 13px;
-    flex-shrink: 0;
-}
-
-.user-info { flex: 1; min-width: 0; }
-.user-name {
-    font-size: 13px;
-    font-weight: 600;
-    color: #ddd;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-.user-role { font-size: 11px; color: #555; text-transform: uppercase; letter-spacing: 0.5px; }
-
-.btn-logout {
-    background: none;
-    border: none;
-    color: #555;
-    cursor: pointer;
-    font-size: 16px;
-    padding: 4px;
-    transition: color 0.15s;
-}
-.btn-logout:hover { color: #ff6b6b; }
-
-.main {
-    margin-left: 240px;
-    flex: 1;
-    padding: 36px 40px;
-    min-width: 0;
-}
-
-.page-header {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    margin-bottom: 40px;
-    gap: 20px;
-    flex-wrap: wrap;
-}
-
-h1 {
-    font-family: 'Syne', sans-serif;
-    font-size: 26px;
-    font-weight: 800;
-    color: #fff;
-    margin: 0 0 4px;
-}
-
-.page-sub { font-size: 13px; color: #555; margin: 0; }
-
-.upload-zone { display: flex; align-items: center; gap: 10px; }
-
-.btn-choose {
-    background: #1a1a28;
-    border: 1px dashed #333;
-    border-radius: 8px;
-    padding: 10px 18px;
-    color: #aaa;
-    font-size: 13px;
-    cursor: pointer;
-    transition: all 0.15s;
-    max-width: 220px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    display: block;
-}
-.btn-choose:hover { border-color: #FFB400; color: #FFB400; }
-
-.btn-upload {
-    background: #FFB400;
-    color: #000;
-    border: none;
-    border-radius: 8px;
-    padding: 10px 20px;
-    font-weight: 700;
-    font-size: 13px;
-    font-family: 'Syne', sans-serif;
-    cursor: pointer;
-    transition: background 0.15s;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    white-space: nowrap;
-}
-.btn-upload:hover:not(:disabled) { background: #ffc933; }
-.btn-upload:disabled { opacity: 0.5; cursor: not-allowed; }
-
-.section { margin-bottom: 40px; }
-
-.section-title {
-    font-family: 'Syne', sans-serif;
-    font-size: 14px;
-    font-weight: 700;
-    color: #555;
-    text-transform: uppercase;
-    letter-spacing: 1.5px;
-    margin: 0 0 16px;
-}
-
-.loading, .empty { color: #444; font-size: 14px; padding: 24px 0; }
-
-.doc-grid { display: flex; flex-direction: column; gap: 8px; }
-
-.doc-card {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    background: #111118;
-    border: 1px solid #1e1e2e;
-    border-radius: 10px;
-    padding: 14px 18px;
-    transition: border-color 0.15s;
-}
-
-.doc-card:hover { border-color: #2e2e44; }
-.doc-card.shared { border-left: 2px solid #FFB400; }
-
-.doc-icon { font-size: 24px; flex-shrink: 0; }
-.doc-info { flex: 1; min-width: 0; }
-
-.doc-name {
-    font-size: 14px;
-    font-weight: 500;
-    color: #ddd;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.doc-meta { font-size: 12px; color: #555; margin-top: 2px; }
-.doc-shared { font-size: 11px; color: #FFB400; margin-top: 2px; }
-
-.doc-actions { display: flex; gap: 6px; flex-shrink: 0; }
-
-.btn-icon {
-    background: #1a1a28;
-    border: 1px solid #2a2a3a;
-    border-radius: 6px;
-    padding: 6px 10px;
-    font-size: 14px;
-    cursor: pointer;
-    transition: all 0.15s;
-    color: #888;
-}
-.btn-icon:hover { background: #222238; border-color: #444; }
-.btn-icon.danger:hover { background: rgba(255,60,60,0.1); border-color: rgba(255,60,60,0.3); }
-
-.modal-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.7);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 1000;
-    backdrop-filter: blur(4px);
-}
-
-.modal {
-    background: #111118;
-    border: 1px solid #222230;
-    border-radius: 16px;
-    width: 100%;
-    max-width: 480px;
-    max-height: 90vh;
-    overflow-y: auto;
-}
-
-.modal-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 20px 24px 16px;
-    border-bottom: 1px solid #1e1e2e;
-}
-
-.modal-header h3 {
-    font-family: 'Syne', sans-serif;
-    font-size: 16px;
-    font-weight: 700;
-    color: #fff;
-    margin: 0;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 340px;
-}
-
-.modal-close {
-    background: none;
-    border: none;
-    color: #555;
-    font-size: 18px;
-    cursor: pointer;
-    padding: 4px;
-    flex-shrink: 0;
-}
-.modal-close:hover { color: #fff; }
-
-.modal-tabs {
-    display: flex;
-    padding: 16px 24px 0;
-    gap: 8px;
-    border-bottom: 1px solid #1e1e2e;
-}
-
-.tab {
-    background: none;
-    border: none;
-    border-bottom: 2px solid transparent;
-    padding: 8px 4px 12px;
-    font-size: 13px;
-    font-weight: 500;
-    color: #555;
-    cursor: pointer;
-    transition: all 0.15s;
-    font-family: 'DM Sans', sans-serif;
-}
-.tab.active { color: #FFB400; border-bottom-color: #FFB400; }
-.tab:hover { color: #aaa; }
-
-.modal-body {
-    padding: 20px 24px 24px;
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
-}
-
-.field { display: flex; flex-direction: column; gap: 6px; }
-.field-row { display: flex; gap: 12px; }
-.field-row .field { flex: 1; }
-
-label {
-    font-size: 11px;
-    font-weight: 500;
-    color: #666;
-    text-transform: uppercase;
-    letter-spacing: 0.8px;
-}
-
-input, select {
-    background: #0d0d14;
-    border: 1px solid #222230;
-    border-radius: 8px;
-    padding: 10px 14px;
-    color: #fff;
-    font-size: 14px;
-    font-family: 'DM Sans', sans-serif;
-    transition: border-color 0.2s;
-}
-input:focus, select:focus { outline: none; border-color: #FFB400; }
-input::placeholder { color: #333; }
-select option { background: #111118; }
-
-.field-check { display: flex; align-items: center; gap: 10px; }
-
-.btn-primary {
-    background: #FFB400;
-    color: #000;
-    border: none;
-    border-radius: 8px;
-    padding: 12px;
-    font-weight: 700;
-    font-size: 14px;
-    font-family: 'Syne', sans-serif;
-    cursor: pointer;
-    transition: background 0.15s;
-    text-align: center;
-}
-.btn-primary:hover { background: #ffc933; }
-
-.link-result {
-    background: #0d0d14;
-    border: 1px solid #222230;
-    border-radius: 8px;
-    padding: 14px;
-}
-
-.link-label { font-size: 11px; color: #555; text-transform: uppercase; letter-spacing: 0.8px; margin: 0 0 8px; }
-
-.link-box { display: flex; align-items: center; gap: 10px; }
-
-.link-text {
-    font-size: 11px;
-    color: #FFB400;
-    word-break: break-all;
-    flex: 1;
-}
-
-.btn-copy {
-    background: #1a1a28;
-    border: 1px solid #333;
-    border-radius: 6px;
-    padding: 6px 12px;
-    color: #aaa;
-    font-size: 12px;
-    cursor: pointer;
-    white-space: nowrap;
-    flex-shrink: 0;
-}
-.btn-copy:hover { border-color: #FFB400; color: #FFB400; }
-
-.shared-list { margin-top: 4px; }
-.shared-list-title { font-size: 12px; color: #555; margin: 0 0 10px; }
-
-.shared-user {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 8px 0;
-    border-bottom: 1px solid #1a1a28;
-    font-size: 13px;
-    color: #aaa;
-}
-
-.shared-avatar {
-    width: 28px;
-    height: 28px;
-    background: #FFB400;
-    color: #000;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: 700;
-    font-size: 11px;
-    flex-shrink: 0;
-}
-
-.shared-user small { color: #444; font-size: 11px; }
-
-.spinner {
-    width: 14px;
-    height: 14px;
-    border: 2px solid rgba(0,0,0,0.3);
-    border-top-color: #000;
-    border-radius: 50%;
-    animation: spin 0.7s linear infinite;
-}
-@keyframes spin { to { transform: rotate(360deg); } }
-</style>
