@@ -122,7 +122,7 @@ onMounted(() => tryAccess())
                 <p class="text-[#555] text-sm">{{ errorMsg }}</p>
             </div>
 
-            <p class="mt-10 text-xs text-[#333]">Partagé via <strong class="text-[#444]">YAMS Drive</strong></p>
+            <p class="mt-10 text-xs text-[#333]">Partagé via <strong class="text-[#444]">YANN Drive</strong></p>
 
         </div>
     </div>

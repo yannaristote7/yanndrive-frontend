@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '@/api'
 import { useToast } from '@/composables/useToast'
@@ -16,6 +16,24 @@ const loading = ref(true)
 const uploading = ref(false)
 const sidebarOpen = ref(false)
 
+// Pagination
+const currentPage = ref(1)
+const lastPage = ref(1)
+const perPage = 10
+
+// Recherche
+const search = ref('')
+let searchTimeout = null
+
+watch(search, () => {
+    clearTimeout(searchTimeout)
+    searchTimeout = setTimeout(() => {
+        currentPage.value = 1
+        fetchDocuments(1)
+    }, 400)
+})
+
+// Partage
 const shareModal = ref(false)
 const selectedDoc = ref(null)
 const shareEmail = ref('')
@@ -23,18 +41,37 @@ const shareTab = ref('user')
 const publicLinkResult = ref(null)
 const linkForm = ref({ permission: 'read', allow_download: true, expires_in_days: 7, password: '', email: '' })
 
-const fetchDocuments = async () => {
+const fetchDocuments = async (page = 1) => {
+    loading.value = true
     try {
-        const res = await api.get('/api/documents')
+        const res = await api.get('/api/documents', {
+            params: {
+                page,
+                per_page: perPage,
+                search: search.value || undefined
+            }
+        })
         if (res.data.type === 'admin') {
-            documents.value = res.data.documents || []
+            documents.value = res.data.documents.data || []
+            lastPage.value = res.data.documents.last_page || 1
             sharedDocuments.value = []
         } else {
-            documents.value = res.data.owned_documents || []
-            sharedDocuments.value = res.data.shared_documents || []
+            documents.value = res.data.owned_documents.data || []
+            lastPage.value = res.data.owned_documents.last_page || 1
+            sharedDocuments.value = res.data.shared_documents.data || []
         }
-    } catch (e) { console.error(e.response?.data) }
-    finally { loading.value = false }
+        currentPage.value = page
+    } catch (e) {
+        console.error(e.response?.data)
+    } finally {
+        loading.value = false
+    }
+}
+
+const goToPage = (page) => {
+    if (page < 1 || page > lastPage.value) return
+    fetchDocuments(page)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
 const handleFileChange = (e) => { file.value = e.target.files[0] }
@@ -48,19 +85,24 @@ const uploadDocument = async () => {
         await api.post('/api/documents', formData)
         file.value = null
         document.getElementById('fileInput').value = ''
-        await fetchDocuments()
+        await fetchDocuments(currentPage.value)
         toast.success('Document uploadé avec succès !')
-    } catch (e) { toast.error(e.response?.data?.message || 'Erreur upload') }
-    finally { uploading.value = false }
+    } catch (e) {
+        toast.error(e.response?.data?.message || 'Erreur upload')
+    } finally {
+        uploading.value = false
+    }
 }
 
 const deleteDocument = async (id) => {
     if (!confirm('Supprimer ce document ?')) return
     try {
         await api.delete(`/api/documents/${id}`)
-        await fetchDocuments()
+        await fetchDocuments(currentPage.value)
         toast.success('Document supprimé')
-    } catch (e) { toast.error(e.response?.data?.message || 'Erreur suppression') }
+    } catch (e) {
+        toast.error(e.response?.data?.message || 'Erreur suppression')
+    }
 }
 
 const downloadDocument = async (id, name) => {
@@ -69,7 +111,9 @@ const downloadDocument = async (id, name) => {
         const url = window.URL.createObjectURL(new Blob([res.data]))
         const a = document.createElement('a'); a.href = url; a.download = name; a.click()
         window.URL.revokeObjectURL(url)
-    } catch (e) { toast.error('Erreur lors du téléchargement') }
+    } catch (e) {
+        toast.error('Erreur lors du téléchargement')
+    }
 }
 
 const openShare = (doc) => {
@@ -84,9 +128,11 @@ const shareWithUser = async () => {
         await api.post(`/api/documents/${selectedDoc.value.id}/share`, { email: shareEmail.value })
         toast.success('Document partagé avec succès !')
         shareEmail.value = ''
-        await fetchDocuments()
+        await fetchDocuments(currentPage.value)
         selectedDoc.value = documents.value.find(d => d.id === selectedDoc.value.id)
-    } catch (e) { toast.error(e.response?.data?.message || 'Erreur partage') }
+    } catch (e) {
+        toast.error(e.response?.data?.message || 'Erreur partage')
+    }
 }
 
 const generateLink = async () => {
@@ -104,7 +150,9 @@ const generateLink = async () => {
         const signature = url.searchParams.get('signature')
         publicLinkResult.value = `http://localhost:5173/share/${token}?expires=${expires}&signature=${signature}`
         toast.success('Lien généré !')
-    } catch (e) { toast.error(e.response?.data?.message || 'Erreur génération lien') }
+    } catch (e) {
+        toast.error(e.response?.data?.message || 'Erreur génération lien')
+    }
 }
 
 const copyLink = () => {
@@ -124,19 +172,7 @@ const fileIcon = (m) => { if (!m) return '📄'; if (m.includes('pdf')) return '
 
 const inputClass = "w-full bg-[#0d0d14] border border-[#222230] rounded-lg px-3 py-2.5 text-white text-sm placeholder-[#333] focus:outline-none focus:border-[#FFB400] transition-colors"
 
-const search = ref('')
-const filteredDocuments = computed(() => {
-    if (!search.value.trim()) return documents.value
-    const q = search.value.toLowerCase()
-    return documents.value.filter(d => d.name.toLowerCase().includes(q))
-})
-const filteredShared = computed(() => {
-    if (!search.value.trim()) return sharedDocuments.value
-    const q = search.value.toLowerCase()
-    return sharedDocuments.value.filter(d => d.name.toLowerCase().includes(q))
-})
-
-onMounted(fetchDocuments)
+onMounted(() => fetchDocuments(1))
 </script>
 
 <template>
@@ -197,94 +233,122 @@ onMounted(fetchDocuments)
             <button @click="logout" class="text-[#555] hover:text-red-400 transition-colors">↩</button>
         </div>
 
-        <div class="p-4 sm:p-6 lg:p-10">
-            <div class="dash-main">
-                <!-- HEADER -->
-                <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6">
-                    <div>
-                        <h1 class="text-xl sm:text-2xl font-black text-white mb-1" style="font-family:'Syne',sans-serif">Mes documents</h1>
-                        <p class="text-xs text-[#555]">{{ documents.length }} fichier(s) • {{ sharedDocuments.length }} partagé(s) avec moi</p>
-                    </div>
+        <div class="p-4 sm:p-6 lg:p-10 dash-main">
 
-                    <!-- UPLOAD -->
-                    <div class="flex items-center gap-2 flex-wrap">
-                        <input id="fileInput" type="file" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx,.txt,.zip" @change="handleFileChange" class="hidden" />
-                        <label for="fileInput"
-                            class="bg-[#1a1a28] border border-dashed border-[#333] hover:border-[#FFB400] hover:text-[#FFB400] text-[#aaa] rounded-lg px-3 py-2 text-xs cursor-pointer transition-all truncate max-w-[150px] sm:max-w-[200px]">
-                            {{ file ? file.name : '+ Choisir un fichier' }}
-                        </label>
-                        <button @click="uploadDocument" :disabled="!file || uploading"
-                            class="bg-[#FFB400] hover:bg-[#ffc933] disabled:opacity-50 disabled:cursor-not-allowed text-black font-bold rounded-lg px-4 py-2 text-xs flex items-center gap-2 transition-colors whitespace-nowrap"
-                            style="font-family:'Syne',sans-serif">
-                            <span v-if="uploading" class="w-3 h-3 border-2 border-black/30 border-t-black rounded-full animate-spin"></span>
-                            <span v-else>Uploader</span>
-                        </button>
-                    </div>
+            <!-- HEADER -->
+            <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6">
+                <div>
+                    <h1 class="text-xl sm:text-2xl font-black text-white mb-1" style="font-family:'Syne',sans-serif">Mes documents</h1>
+                    <p class="text-xs text-[#555]">{{ documents.length }} fichier(s) • {{ sharedDocuments.length }} partagé(s) avec moi</p>
                 </div>
 
-                <!-- BARRE DE RECHERCHE -->
-                <div class="flex items-center gap-3 bg-[#111118] border border-[#1e1e2e] focus-within:border-[#FFB400] rounded-xl px-4 py-3 mb-6 transition-colors">
-                    <span class="text-[#444] text-sm shrink-0">🔍</span>
-                    <input v-model="search" type="text" placeholder="Rechercher un fichier..."
-                        class="bg-transparent flex-1 text-sm text-white placeholder-[#444] focus:outline-none min-w-0" />
-                    <button v-if="search" @click="search = ''" class="text-[#444] hover:text-[#aaa] text-xs transition-colors shrink-0">✕</button>
-                    <span v-if="search" class="text-[11px] text-[#555] shrink-0 hidden sm:block">
-                        {{ filteredDocuments.length + filteredShared.length }} résultat(s)
-                    </span>
+                <!-- UPLOAD -->
+                <div class="flex items-center gap-2 flex-wrap">
+                    <input id="fileInput" type="file" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx,.txt,.zip" @change="handleFileChange" class="hidden" />
+                    <label for="fileInput"
+                        class="bg-[#1a1a28] border border-dashed border-[#333] hover:border-[#FFB400] hover:text-[#FFB400] text-[#aaa] rounded-lg px-3 py-2 text-xs cursor-pointer transition-all truncate max-w-[150px] sm:max-w-[200px]">
+                        {{ file ? file.name : '+ Choisir un fichier' }}
+                    </label>
+                    <button @click="uploadDocument" :disabled="!file || uploading"
+                        class="bg-[#FFB400] hover:bg-[#ffc933] disabled:opacity-50 disabled:cursor-not-allowed text-black font-bold rounded-lg px-4 py-2 text-xs flex items-center gap-2 transition-colors whitespace-nowrap"
+                        style="font-family:'Syne',sans-serif">
+                        <span v-if="uploading" class="w-3 h-3 border-2 border-black/30 border-t-black rounded-full animate-spin"></span>
+                        <span v-else>Uploader</span>
+                    </button>
                 </div>
-
-                <!-- MES FICHIERS -->
-                <section class="mb-8">
-                    <h2 class="text-[11px] font-bold text-[#555] uppercase tracking-[2px] mb-4" style="font-family:'Syne',sans-serif">
-                        Mes fichiers
-                        <span v-if="search" class="normal-case font-normal text-[#444] ml-2">— {{ filteredDocuments.length }} résultat(s)</span>
-                    </h2>
-
-                    <div v-if="loading" class="text-[#444] text-sm py-6">Chargement...</div>
-                    <div v-else-if="documents.length === 0" class="text-[#444] text-sm py-6">Aucun document. Uploadez votre premier fichier !</div>
-                    <div v-else-if="filteredDocuments.length === 0 && search" class="text-[#444] text-sm py-6">Aucun fichier ne correspond à « {{ search }} »</div>
-
-                    <div v-else class="space-y-2">
-                        <div v-for="doc in filteredDocuments" :key="doc.id"
-                            class="flex items-center gap-3 bg-[#111118] border border-[#1e1e2e] hover:border-[#2e2e44] rounded-xl px-4 py-3 transition-colors">
-                            <span class="text-xl sm:text-2xl shrink-0">{{ fileIcon(doc.mime_type) }}</span>
-                            <div class="flex-1 min-w-0">
-                                <div class="text-sm font-medium text-[#ddd] truncate">{{ doc.name }}</div>
-                                <div class="text-xs text-[#555] mt-0.5">{{ formatSize(doc.size) }} • {{ formatDate(doc.created_at) }}</div>
-                                <div v-if="doc.shared_with?.length" class="text-[11px] text-[#FFB400] mt-0.5">
-                                    Partagé avec {{ doc.shared_with.length }} personne(s)
-                                </div>
-                            </div>
-                            <div class="flex gap-1 sm:gap-1.5 shrink-0">
-                                <button @click="downloadDocument(doc.id, doc.name)"
-                                    class="bg-[#1a1a28] border border-[#2a2a3a] hover:bg-[#222238] hover:border-[#444] rounded-md px-2 sm:px-2.5 py-1.5 text-sm transition-all">⬇</button>
-                                <button @click="openShare(doc)"
-                                    class="bg-[#1a1a28] border border-[#2a2a3a] hover:bg-[#222238] hover:border-[#444] rounded-md px-2 sm:px-2.5 py-1.5 text-sm transition-all">🔗</button>
-                                <button @click="deleteDocument(doc.id)"
-                                    class="bg-[#1a1a28] border border-[#2a2a3a] hover:bg-red-500/10 hover:border-red-500/30 rounded-md px-2 sm:px-2.5 py-1.5 text-sm transition-all">🗑</button>
-                            </div>
-                        </div>
-                    </div>
-                </section>
-
-                <!-- PARTAGÉS AVEC MOI -->
-                <section v-if="filteredShared.length > 0">
-                    <h2 class="text-[11px] font-bold text-[#555] uppercase tracking-[2px] mb-4" style="font-family:'Syne',sans-serif">Partagés avec moi</h2>
-                    <div class="space-y-2">
-                        <div v-for="doc in filteredShared" :key="doc.id"
-                            class="flex items-center gap-3 bg-[#111118] border-l-2 border-l-[#FFB400] border border-[#1e1e2e] rounded-xl px-4 py-3">
-                            <span class="text-xl sm:text-2xl shrink-0">{{ fileIcon(doc.mime_type) }}</span>
-                            <div class="flex-1 min-w-0">
-                                <div class="text-sm font-medium text-[#ddd] truncate">{{ doc.name }}</div>
-                                <div class="text-xs text-[#555] mt-0.5">Par {{ doc.user?.name }} • {{ formatDate(doc.created_at) }}</div>
-                            </div>
-                            <button @click="downloadDocument(doc.id, doc.name)"
-                                class="bg-[#1a1a28] border border-[#2a2a3a] hover:bg-[#222238] rounded-md px-2 sm:px-2.5 py-1.5 text-sm transition-all shrink-0">⬇</button>
-                        </div>
-                    </div>
-                </section>
-
             </div>
+
+            <!-- BARRE DE RECHERCHE -->
+            <div class="flex items-center gap-3 bg-[#111118] border border-[#1e1e2e] focus-within:border-[#FFB400] rounded-xl px-4 py-3 mb-6 transition-colors">
+                <span class="text-[#444] text-sm shrink-0">🔍</span>
+                <input v-model="search" type="text" placeholder="Rechercher dans tous les documents..."
+                    class="bg-transparent flex-1 text-sm text-white placeholder-[#444] focus:outline-none min-w-0" />
+                <button v-if="search" @click="search = ''" class="text-[#444] hover:text-[#aaa] text-xs transition-colors shrink-0">✕</button>
+                <span v-if="loading && search" class="w-3 h-3 border-2 border-[#444] border-t-[#FFB400] rounded-full animate-spin shrink-0"></span>
+            </div>
+
+            <!-- MES FICHIERS -->
+            <section class="mb-8">
+                <h2 class="text-[11px] font-bold text-[#555] uppercase tracking-[2px] mb-4" style="font-family:'Syne',sans-serif">
+                    Mes fichiers
+                    <span v-if="search" class="normal-case font-normal text-[#444] ml-2">— résultats pour « {{ search }} »</span>
+                </h2>
+
+                <div v-if="loading" class="text-[#444] text-sm py-6 flex items-center gap-2">
+                    <span class="w-4 h-4 border-2 border-[#333] border-t-[#FFB400] rounded-full animate-spin"></span>
+                    Chargement...
+                </div>
+                <div v-else-if="documents.length === 0" class="text-[#444] text-sm py-6">
+                    {{ search ? `Aucun fichier ne correspond à « ${search} »` : 'Aucun document. Uploadez votre premier fichier !' }}
+                </div>
+
+                <div v-else class="space-y-2">
+                    <div v-for="doc in documents" :key="doc.id"
+                        class="flex items-center gap-3 bg-[#111118] border border-[#1e1e2e] hover:border-[#2e2e44] rounded-xl px-4 py-3 transition-colors">
+                        <span class="text-xl sm:text-2xl shrink-0">{{ fileIcon(doc.mime_type) }}</span>
+                        <div class="flex-1 min-w-0">
+                            <div class="text-sm font-medium text-[#ddd] truncate">{{ doc.name }}</div>
+                            <div class="text-xs text-[#555] mt-0.5">{{ formatSize(doc.size) }} • {{ formatDate(doc.created_at) }}</div>
+                            <div v-if="doc.shared_with?.length" class="text-[11px] text-[#FFB400] mt-0.5">
+                                Partagé avec {{ doc.shared_with.length }} personne(s)
+                            </div>
+                        </div>
+                        <div class="flex gap-1 sm:gap-1.5 shrink-0">
+                            <button @click="downloadDocument(doc.id, doc.name)"
+                                class="bg-[#1a1a28] border border-[#2a2a3a] hover:bg-[#222238] hover:border-[#444] rounded-md px-2 sm:px-2.5 py-1.5 text-sm transition-all">⬇</button>
+                            <button @click="openShare(doc)"
+                                class="bg-[#1a1a28] border border-[#2a2a3a] hover:bg-[#222238] hover:border-[#444] rounded-md px-2 sm:px-2.5 py-1.5 text-sm transition-all">🔗</button>
+                            <button @click="deleteDocument(doc.id)"
+                                class="bg-[#1a1a28] border border-[#2a2a3a] hover:bg-red-500/10 hover:border-red-500/30 rounded-md px-2 sm:px-2.5 py-1.5 text-sm transition-all">🗑</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- PAGINATION -->
+                <div v-if="lastPage > 1" class="flex items-center justify-center gap-2 mt-6 flex-wrap">
+                    <button @click="goToPage(currentPage - 1)" :disabled="currentPage === 1"
+                        class="bg-[#111118] border border-[#1e1e2e] hover:border-[#FFB400] disabled:opacity-30 disabled:cursor-not-allowed text-[#aaa] hover:text-[#FFB400] rounded-lg px-3 py-2 text-sm transition-all">
+                        ←
+                    </button>
+
+                    <template v-for="page in lastPage" :key="page">
+                        <button @click="goToPage(page)"
+                            :class="[
+                                'rounded-lg px-3 py-2 text-sm font-medium transition-all border',
+                                currentPage === page
+                                    ? 'bg-[#FFB400] text-black border-[#FFB400]'
+                                    : 'bg-[#111118] border-[#1e1e2e] text-[#aaa] hover:border-[#FFB400] hover:text-[#FFB400]'
+                            ]">
+                            {{ page }}
+                        </button>
+                    </template>
+
+                    <button @click="goToPage(currentPage + 1)" :disabled="currentPage === lastPage"
+                        class="bg-[#111118] border border-[#1e1e2e] hover:border-[#FFB400] disabled:opacity-30 disabled:cursor-not-allowed text-[#aaa] hover:text-[#FFB400] rounded-lg px-3 py-2 text-sm transition-all">
+                        →
+                    </button>
+
+                    <span class="text-xs text-[#555]">Page {{ currentPage }} / {{ lastPage }}</span>
+                </div>
+            </section>
+
+            <!-- PARTAGÉS AVEC MOI -->
+            <section v-if="sharedDocuments.length > 0">
+                <h2 class="text-[11px] font-bold text-[#555] uppercase tracking-[2px] mb-4" style="font-family:'Syne',sans-serif">Partagés avec moi</h2>
+                <div class="space-y-2">
+                    <div v-for="doc in sharedDocuments" :key="doc.id"
+                        class="flex items-center gap-3 bg-[#111118] border-l-2 border-l-[#FFB400] border border-[#1e1e2e] rounded-xl px-4 py-3">
+                        <span class="text-xl sm:text-2xl shrink-0">{{ fileIcon(doc.mime_type) }}</span>
+                        <div class="flex-1 min-w-0">
+                            <div class="text-sm font-medium text-[#ddd] truncate">{{ doc.name }}</div>
+                            <div class="text-xs text-[#555] mt-0.5">Par {{ doc.user?.name }} • {{ formatDate(doc.created_at) }}</div>
+                        </div>
+                        <button @click="downloadDocument(doc.id, doc.name)"
+                            class="bg-[#1a1a28] border border-[#2a2a3a] hover:bg-[#222238] rounded-md px-2 sm:px-2.5 py-1.5 text-sm transition-all shrink-0">⬇</button>
+                    </div>
+                </div>
+            </section>
+
         </div>
     </main>
 
@@ -380,6 +444,7 @@ onMounted(fetchDocuments)
     </div>
 </div>
 </template>
+
 <style scoped>
 @media (min-width: 1024px) {
     .dash-main {
