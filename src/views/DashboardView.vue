@@ -196,15 +196,15 @@ onMounted(() => fetchDocuments(1))
 
         <nav class="flex-1 space-y-1">
             <a class="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium cursor-pointer bg-[rgba(255,180,0,0.1)] text-[#FFB400]">
-                <span>📁</span> Mes fichiers
+                <span></span> Mes fichiers
             </a>
             <a v-if="isAdmin" @click="router.push('/admin'); sidebarOpen = false"
                 class="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium cursor-pointer text-[#666] hover:bg-[#1a1a28] hover:text-[#ccc] transition-all">
-                <span>🛡️</span> Administration
+                <span></span> Administration
             </a>
             <a v-if="isAdmin" @click="router.push('/admin/logs'); sidebarOpen = false"
                 class="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium cursor-pointer text-[#666] hover:bg-[#1a1a28] hover:text-[#ccc] transition-all">
-                <span>📋</span> Logs d'activité
+                Logs d'activité
             </a>
         </nav>
 

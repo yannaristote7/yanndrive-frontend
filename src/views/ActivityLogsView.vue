@@ -83,8 +83,8 @@ onMounted(fetchLogs)
             <button @click="logout" class="text-[#555] hover:text-red-400 transition-colors">↩</button>
         </div>
 
-        <<div class="p-4 sm:p-6 lg:p-10">
-            <div class="dash-main">
+        <div class="p-4 sm:p-6 lg:p-10">
+            <div class="logs-main">
                 <div class="mb-6">
                     <h1 class="text-xl sm:text-2xl font-black text-white mb-1" style="font-family:'Syne',sans-serif">Logs d'activité</h1>
                     <p class="text-xs text-[#555]">Historique complet de toutes les actions</p>

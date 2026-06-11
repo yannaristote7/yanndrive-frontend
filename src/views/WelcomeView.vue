@@ -98,7 +98,7 @@ const features = [
     </section>
 
     <footer class="text-center py-5 border-t border-[#1a1a28] text-[11px] text-[#333]">
-        © 2025 YAMS Group — YamsDrive
+        © 2025 jeune wise industrie — Plateforme développée par Yann Aristote. Tous droits réservés.
     </footer>
 </div>
 </template>

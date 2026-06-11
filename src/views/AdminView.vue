@@ -15,8 +15,13 @@ const activeTab = ref('documents')
 const sidebarOpen = ref(false)
 
 const fetchDocuments = async () => {
-    try { const res = await api.get('/api/documents'); documents.value = res.data.documents || [] }
-    catch (e) { console.error(e.response?.data) }
+    try {
+        const res = await api.get('/api/documents')
+        const data = res.data.documents
+        documents.value = data?.data || data || []
+    } catch (e) {
+        console.error(e.response?.data)
+    }
 }
 const fetchLogs = async () => {
     try {
@@ -100,7 +105,7 @@ onMounted(async () => { await Promise.all([fetchDocuments(), fetchLogs()]); load
         </div>
 
         <div class="p-4 sm:p-6 lg:p-10">
-            <div class="dash-main">
+            <div class="admin-main">
 
                 <div class="mb-6">
                     <h1 class="text-xl sm:text-2xl font-black text-white mb-1" style="font-family:'Syne',sans-serif">Administration</h1>
