@@ -47,21 +47,21 @@ onMounted(fetchLogs)
     ]">
         <div class="flex items-baseline gap-1 mb-9">
             <span class="font-black text-xl tracking-tight text-white" style="font-family:'Syne',sans-serif">
-                <span class="text-[#FFB400]">Y</span>AMS
+                <span class="text-[#FFB400]">Y</span>ANN
             </span>
             <span class="text-[10px] text-[#555] ml-1 tracking-[3px] uppercase">Drive</span>
         </div>
         <nav class="flex-1 space-y-1">
             <a @click="router.push('/dashboard'); sidebarOpen=false"
                 class="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium cursor-pointer text-[#666] hover:bg-[#1a1a28] hover:text-[#ccc] transition-all">
-                <span>📁</span> Mes fichiers
+                <span></span> Mes fichiers
             </a>
             <a @click="router.push('/admin'); sidebarOpen=false"
                 class="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium cursor-pointer text-[#666] hover:bg-[#1a1a28] hover:text-[#ccc] transition-all">
-                <span>🛡️</span> Administration
+                <span></span> Administration
             </a>
             <a class="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium cursor-pointer bg-[rgba(255,180,0,0.1)] text-[#FFB400]">
-                <span>📋</span> Logs d'activité
+                <span></span> Logs d'activité
             </a>
         </nav>
         <div class="flex items-center gap-2.5 p-3 bg-[#0d0d14] rounded-xl border border-[#1e1e2e]">
@@ -79,7 +79,7 @@ onMounted(fetchLogs)
         <!-- TOPBAR MOBILE -->
         <div class="lg:hidden flex items-center justify-between px-4 py-3 bg-[#111118] border-b border-[#1e1e2e] sticky top-0 z-20">
             <button @click="sidebarOpen = true" class="text-[#aaa] hover:text-white text-xl">☰</button>
-            <span class="font-black text-lg text-white" style="font-family:'Syne',sans-serif"><span class="text-[#FFB400]">Y</span>AMS</span>
+            <span class="font-black text-lg text-white" style="font-family:'Syne',sans-serif"><span class="text-[#FFB400]">Y</span>ANN</span>
             <button @click="logout" class="text-[#555] hover:text-red-400 transition-colors">↩</button>
         </div>
 

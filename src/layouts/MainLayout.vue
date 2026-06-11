@@ -3,25 +3,25 @@
 
     <!-- Sidebar -->
     <aside class="sidebar p-3">
-      <h4 class="text-white fw-bold mb-4">YamsDrive</h4>
+      <h4 class="text-white fw-bold mb-4">YANNDrive</h4>
 
       <ul class="nav flex-column">
 
         <li class="nav-item">
           <router-link to="/dashboard" class="nav-link">
-            📂 Mes Documents
+             Mes Documents
           </router-link>
         </li>
 
         <li class="nav-item" v-if="auth.isAdmin">
           <router-link to="/admin" class="nav-link">
-            📊 Admin Dashboard
+             Admin Dashboard
           </router-link>
         </li>
 
         <li class="nav-item">
           <router-link to="/logs" class="nav-link">
-            📜 Activités
+             Activités
           </router-link>
         </li>
 

@@ -189,7 +189,7 @@ onMounted(() => fetchDocuments(1))
     ]">
         <div class="flex items-baseline gap-1 mb-9">
             <span class="font-black text-xl tracking-tight text-white" style="font-family:'Syne',sans-serif">
-                <span class="text-[#FFB400]">Y</span>AMS
+                <span class="text-[#FFB400]">Y</span>ANN
             </span>
             <span class="text-[10px] text-[#555] ml-1 tracking-[3px] uppercase">Drive</span>
         </div>
@@ -227,7 +227,7 @@ onMounted(() => fetchDocuments(1))
         <div class="lg:hidden flex items-center justify-between px-4 py-3 bg-[#111118] border-b border-[#1e1e2e] sticky top-0 z-20">
             <button @click="sidebarOpen = true" class="text-[#aaa] hover:text-white transition-colors text-xl">☰</button>
             <span class="font-black text-lg text-white" style="font-family:'Syne',sans-serif">
-                <span class="text-[#FFB400]">Y</span>AMS
+                <span class="text-[#FFB400]">Y</span>ANN
                 <span class="text-[10px] text-[#555] ml-1 tracking-[3px] uppercase">Drive</span>
             </span>
             <button @click="logout" class="text-[#555] hover:text-red-400 transition-colors">↩</button>

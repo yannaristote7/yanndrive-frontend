@@ -23,7 +23,7 @@ const features = [
     <!-- NAVBAR -->
     <nav class="sticky top-0 z-50 flex justify-between items-center px-5 sm:px-10 lg:px-16 py-4 border-b border-[#1a1a28] bg-[rgba(9,9,15,0.9)] backdrop-blur-xl">
         <div class="flex items-baseline gap-1" style="font-family:'Syne',sans-serif">
-            <span class="font-black text-xl sm:text-2xl tracking-tight text-white"><span class="text-[#FFB400]">Y</span>AMS</span>
+            <span class="font-black text-xl sm:text-2xl tracking-tight text-white"><span class="text-[#FFB400]">Y</span>ANN</span>
             <span class="text-[10px] text-[#555] ml-1 tracking-[3px] uppercase hidden sm:inline">Drive</span>
         </div>
         <div class="flex gap-2 sm:gap-3 items-center">
@@ -52,7 +52,7 @@ const features = [
                 vos documents
             </h1>
             <p class="text-[#666] text-sm sm:text-base leading-relaxed mb-8">
-                YamsDrive centralise tous vos fichiers d'entreprise avec des permissions granulaires, des liens sécurisés et un suivi complet des accès.
+                YANNDrive centralise tous vos fichiers d'entreprise avec des permissions granulaires, des liens sécurisés et un suivi complet des accès.
             </p>
             <div class="flex gap-3 flex-wrap justify-center lg:justify-start">
                 <router-link to="/register"
