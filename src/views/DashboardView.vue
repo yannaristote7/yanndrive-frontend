@@ -163,7 +163,7 @@ const copyLink = () => {
 const logout = async () => {
     await api.post('/api/logout')
     localStorage.removeItem('token'); localStorage.removeItem('user')
-    router.push('/login')
+    router.push('/')
 }
 
 const formatSize = (b) => { if (!b) return '—'; if (b < 1024) return b + ' B'; if (b < 1048576) return (b/1024).toFixed(1)+' KB'; return (b/1048576).toFixed(1)+' MB' }

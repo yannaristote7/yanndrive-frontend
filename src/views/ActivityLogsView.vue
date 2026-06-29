@@ -26,7 +26,7 @@ const fetchLogs = async () => {
 const logout = async () => {
     await api.post('/api/logout')
     localStorage.removeItem('token'); localStorage.removeItem('user')
-    router.push('/login')
+    router.push('/')
 }
 
 const formatDate = (d) => { if (!d) return '—'; return new Date(d).toLocaleDateString('fr-FR', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' }) }

@@ -39,7 +39,7 @@ const login = async () => {
 
             <div class="flex items-baseline gap-1 mb-8">
                 <span class="font-black text-2xl sm:text-3xl tracking-tight" style="font-family:'Syne',sans-serif">
-                    <span class="text-[#FFB400]">Y</span>AMS
+                    <span class="text-[#FFB400]">Y</span>ANN
                 </span>
                 <span class="text-[10px] text-[#555] ml-1 tracking-[3px] uppercase">Drive</span>
             </div>

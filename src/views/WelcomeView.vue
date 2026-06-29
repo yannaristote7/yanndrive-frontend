@@ -9,10 +9,10 @@ const previewDocs = [
     { icon: '🖼️', name: 'Logo_YamsGroup.png', meta: '340 KB • Privé', status: 'privé', statusClass: 'bg-white/5 text-[#555] border border-[#222]' },
 ]
 const features = [
-    { icon: '🔒', title: 'Accès sécurisé', desc: 'Domaines autorisés uniquement. Chaque fichier est protégé par authentification Sanctum.' },
-    { icon: '🔗', title: 'Liens publics', desc: "Générez des liens temporaires avec mot de passe, date d'expiration et contrôle de téléchargement." },
-    { icon: '👥', title: 'Partage interne', desc: 'Partagez vos documents avec vos collègues en quelques clics, avec suivi des accès.' },
-    { icon: '📋', title: "Logs d'activité", desc: "L'administrateur visualise toutes les actions en temps réel : uploads, partages, téléchargements." },
+    { icon: '', title: 'Accès sécurisé', desc: 'Domaines autorisés uniquement. Chaque fichier est protégé par authentification Sanctum.' },
+    { icon: '', title: 'Liens publics', desc: "Générez des liens temporaires avec mot de passe, date d'expiration et contrôle de téléchargement." },
+    { icon: '', title: 'Partage interne', desc: 'Partagez vos documents avec vos collègues en quelques clics, avec suivi des accès.' },
+    { icon: '', title: "Logs d'activité", desc: "L'administrateur visualise toutes les actions en temps réel : uploads, partages, téléchargements." },
 ]
 </script>
 
@@ -54,15 +54,8 @@ const features = [
             <p class="text-[#666] text-sm sm:text-base leading-relaxed mb-8">
                 YANNDrive centralise tous vos fichiers d'entreprise avec des permissions granulaires, des liens sécurisés et un suivi complet des accès.
             </p>
-            <div class="flex gap-3 flex-wrap justify-center lg:justify-start">
-                <router-link to="/register"
-                    class="bg-[#FFB400] hover:bg-[#ffc933] text-black font-bold px-6 py-3 rounded-lg text-sm sm:text-base transition-colors"
-                    style="font-family:'Syne',sans-serif">Créer un compte</router-link>
-                <router-link to="/login"
-                    class="border border-[#2a2a3a] text-[#aaa] hover:border-[#FFB400] hover:text-[#FFB400] px-6 py-3 rounded-lg text-sm sm:text-base font-medium transition-all">
-                    Se connecter
-                </router-link>
-            </div>
+            
+            
         </div>
 
         <!-- VISUAL CARD — caché sur mobile -->

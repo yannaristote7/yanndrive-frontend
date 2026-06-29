@@ -46,7 +46,7 @@ const downloadDocument = async (id, name) => {
 const logout = async () => {
     await api.post('/api/logout')
     localStorage.removeItem('token'); localStorage.removeItem('user')
-    router.push('/login')
+    router.push('/')
 }
 const formatSize = (b) => { if (!b) return '—'; if (b < 1024) return b + ' B'; if (b < 1048576) return (b/1024).toFixed(1)+' KB'; return (b/1048576).toFixed(1)+' MB' }
 const formatDate = (d) => { if (!d) return '—'; return new Date(d).toLocaleDateString('fr-FR', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' }) }
