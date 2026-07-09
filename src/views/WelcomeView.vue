@@ -9,7 +9,7 @@ const previewDocs = [
     { icon: '🖼️', name: 'Logo_YamsGroup.png', meta: '340 KB • Privé', status: 'privé', statusClass: 'bg-white/5 text-[#555] border border-[#222]' },
 ]
 const features = [
-    { icon: '', title: 'Accès sécurisé', desc: 'Domaines autorisés uniquement. Chaque fichier est protégé par authentification Sanctum.' },
+    { icon: '', title: 'Accès sécurisé', desc: 'Domaines autorisés uniquement. Chaque fichier est protégé par authentification.' },
     { icon: '', title: 'Liens publics', desc: "Générez des liens temporaires avec mot de passe, date d'expiration et contrôle de téléchargement." },
     { icon: '', title: 'Partage interne', desc: 'Partagez vos documents avec vos collègues en quelques clics, avec suivi des accès.' },
     { icon: '', title: "Logs d'activité", desc: "L'administrateur visualise toutes les actions en temps réel : uploads, partages, téléchargements." },
