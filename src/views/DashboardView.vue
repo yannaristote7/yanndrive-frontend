@@ -16,6 +16,9 @@ const loading = ref(true)
 const uploading = ref(false)
 const sidebarOpen = ref(false)
 
+// Stockage
+const storageUsage = ref({ used: 0, max: 0, percentage: 0 })
+
 // Pagination
 const currentPage = ref(1)
 const lastPage = ref(1)
@@ -68,6 +71,15 @@ const fetchDocuments = async (page = 1) => {
     }
 }
 
+const fetchStorageUsage = async () => {
+    try {
+        const res = await api.get('/api/storage-usage')
+        storageUsage.value = res.data
+    } catch (e) {
+        console.error(e.response?.data)
+    }
+}
+
 const goToPage = (page) => {
     if (page < 1 || page > lastPage.value) return
     fetchDocuments(page)
@@ -86,6 +98,7 @@ const uploadDocument = async () => {
         file.value = null
         document.getElementById('fileInput').value = ''
         await fetchDocuments(currentPage.value)
+        await fetchStorageUsage()
         toast.success('Document uploadé avec succès !')
     } catch (e) {
         toast.error(e.response?.data?.message || 'Erreur upload')
@@ -99,6 +112,7 @@ const deleteDocument = async (id) => {
     try {
         await api.delete(`/api/documents/${id}`)
         await fetchDocuments(currentPage.value)
+        await fetchStorageUsage()
         toast.success('Document supprimé')
     } catch (e) {
         toast.error(e.response?.data?.message || 'Erreur suppression')
@@ -168,11 +182,14 @@ const logout = async () => {
 
 const formatSize = (b) => { if (!b) return '—'; if (b < 1024) return b + ' B'; if (b < 1048576) return (b/1024).toFixed(1)+' KB'; return (b/1048576).toFixed(1)+' MB' }
 const formatDate = (d) => new Date(d).toLocaleDateString('fr-FR', { day:'2-digit', month:'short', year:'numeric' })
-const fileIcon = (m) => { if (!m) return '📄'; if (m.includes('pdf')) return '📕'; if (m.includes('image')) return '🖼️'; if (m.includes('word')||m.includes('document')) return '📝'; if (m.includes('sheet')||m.includes('excel')) return '📊'; if (m.includes('zip')) return '📦'; return '📄' }
+const fileIcon = (m) => { if (!m) return ''; if (m.includes('pdf')) return ''; if (m.includes('image')) return ''; if (m.includes('word')||m.includes('document')) return ''; if (m.includes('sheet')||m.includes('excel')) return ''; if (m.includes('zip')) return ''; return '' }
 
 const inputClass = "w-full bg-[#0d0d14] border border-[#222230] rounded-lg px-3 py-2.5 text-white text-sm placeholder-[#333] focus:outline-none focus:border-[#FFB400] transition-colors"
 
-onMounted(() => fetchDocuments(1))
+onMounted(() => {
+    fetchDocuments(1)
+    fetchStorageUsage()
+})
 </script>
 
 <template>
@@ -194,7 +211,7 @@ onMounted(() => fetchDocuments(1))
             <span class="text-[10px] text-[#555] ml-1 tracking-[3px] uppercase">Drive</span>
         </div>
 
-        <nav class="flex-1 space-y-1">
+        <nav class="space-y-1 mb-4">
             <a class="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium cursor-pointer bg-[rgba(255,180,0,0.1)] text-[#FFB400]">
                 <span></span> Mes fichiers
             </a>
@@ -204,9 +221,24 @@ onMounted(() => fetchDocuments(1))
             </a>
             <a v-if="isAdmin" @click="router.push('/admin/logs'); sidebarOpen = false"
                 class="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium cursor-pointer text-[#666] hover:bg-[#1a1a28] hover:text-[#ccc] transition-all">
-                Logs d'activité
+                <span></span> Logs d'activité
             </a>
         </nav>
+
+        <!-- BARRE DE STOCKAGE -->
+        <div class="flex-1"></div>
+        <div class="bg-[#0d0d14] border border-[#1e1e2e] rounded-xl p-3 mb-3">
+            <div class="flex justify-between items-center text-[11px] text-[#666] mb-1.5">
+                <span>Stockage</span>
+                <span>{{ formatSize(storageUsage.used) }} / {{ formatSize(storageUsage.max) }}</span>
+            </div>
+            <div class="h-1.5 bg-[#1a1a28] rounded-full overflow-hidden">
+                <div
+                    :class="['h-full transition-all duration-300', storageUsage.percentage > 90 ? 'bg-red-500' : storageUsage.percentage > 70 ? 'bg-orange-400' : 'bg-[#FFB400]']"
+                    :style="{ width: Math.min(storageUsage.percentage, 100) + '%' }"
+                ></div>
+            </div>
+        </div>
 
         <div class="flex items-center gap-2.5 p-3 bg-[#0d0d14] rounded-xl border border-[#1e1e2e]">
             <div class="w-8 h-8 bg-[#FFB400] text-black rounded-full flex items-center justify-center font-bold text-sm shrink-0">
@@ -256,6 +288,11 @@ onMounted(() => fetchDocuments(1))
                         <span v-else>Uploader</span>
                     </button>
                 </div>
+            </div>
+
+            <!-- ALERTE QUOTA PROCHE -->
+            <div v-if="storageUsage.percentage > 90" class="bg-red-500/10 border border-red-500/30 text-red-400 rounded-xl px-4 py-3 mb-6 text-xs">
+                ⚠️ Vous avez utilisé {{ storageUsage.percentage }}% de votre espace de stockage. Supprimez des fichiers ou contactez un administrateur.
             </div>
 
             <!-- BARRE DE RECHERCHE -->
