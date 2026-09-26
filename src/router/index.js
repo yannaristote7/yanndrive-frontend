@@ -2,8 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import LoginView from '@/views/LoginView.vue'
 import RegisterView from '@/views/RegisterView.vue'
 import DashboardView from '@/views/DashboardView.vue'
-import AdminView from '@/views/AdminView.vue'
-import ActivityLogsView from '@/views/ActivityLogsView.vue'
+import AdminLayout from '@/layouts/AdminLayout.vue'
 
 
 
@@ -12,9 +11,19 @@ const routes = [
     { path: '/login', component: LoginView, meta: { guest: true } },
     { path: '/register', component: RegisterView, meta: { guest: true } },
     { path: '/dashboard', component: DashboardView, meta: { requiresAuth: true } },
-    { path: '/admin', component: AdminView, meta: { requiresAuth: true, requiresAdmin: true } },
     { path: '/share/:token', component: () => import('@/views/PublicShareView.vue') },
-    { path: '/admin/logs', component: ActivityLogsView, meta: { requiresAuth: true, requiresAdmin: true } }
+    {
+        path: '/admin',
+        component: AdminLayout,
+        meta: { requiresAuth: true, requiresAdmin: true },
+        children: [
+            { path: '', component: () => import('@/views/admin/AdminOverview.vue') },
+            { path: 'users', component: () => import('@/views/admin/AdminUsers.vue') },
+            { path: 'documents', component: () => import('@/views/admin/AdminDocuments.vue') },
+            { path: 'domains', component: () => import('@/views/admin/AdminDomains.vue') },
+            { path: 'logs', component: () => import('@/views/admin/AdminLogs.vue') },
+        ]
+    }
 ]
 
 const router = createRouter({
